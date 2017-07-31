@@ -34,9 +34,6 @@ byte encoder_B_pin = 7; // Пин вывода B
 /*Считывание датчик температуры */
 byte count_cycle_temp = 0;
 
-/*Изменение с энкодера*/
-uint16_t prev_val, cur_val;
-uint16_t prev_time, cur_time;
 
 timer_radar blink_temp(2);
 timer_radar mytime(2);
@@ -60,30 +57,17 @@ void loop(){
   prev_millis_speed = millis(); // время на начало программы
   /************************************/
  
-  //time_millis = micros(); // время прошедшее после включения
   t=encoder_read(t, 1);
-  //Serial.println(t);
-  Serial.print(prev_time); Serial.print("---");
-  Serial.print(cur_time); Serial.print("---");
-  Serial.println(t);
-  write_display_temp(change_val(t));
+  change_val(t);
 
-  //Serial.println(change_val(t));
-  //Serial.println(t);
+  //write_display_temp(t);
   //seg7_write(0x20, t, 0);
   //temp_metr(1);
   //dac_write(dac1, 27);
   //t=dht.readTemperature();
-  // Serial.println(temp_metr(100));
-
-  //EEPROM.write(1, 128);
-  
-  //Serial.println(EEPROM.read(1));
   //read_pcf(pcf5, 4);
 
-  //if (read_pcf(pcf5,4) == 0b1110) {
-  //  Serial.println("YES");
-  //}
+
   /*Замер скорости работы программы*/
   cur_millis_speed = millis(); // время на конец программы
   //Serial.println(cur_millis_speed - prev_millis_speed);
@@ -201,6 +185,18 @@ void seg7_write(byte addr, unsigned char val, byte dot){
   dot? Wire.write(_val_bit |= 1 << 7):Wire.write(_val_bit |= 0 << 7); // вывод точки
   Wire.endTransmission(); // конец передачи
 }
+
+//Выключение дисплея. 
+void display_hide(byte init){
+    if (init) {
+      seg7_write(pcf1, ' ', 0);
+      seg7_write(pcf2, ' ', 0);
+      seg7_write(pcf3, ' ', 0);
+      seg7_write(pcf4, ' ', 0);
+    } else {
+      ;
+    }
+ }
 
 /*Функция вывода температуры на семисегментный дисплей*/
 //Принимает значение температуры float
@@ -346,22 +342,16 @@ byte read_pcf(byte addr, byte pcf_byte) {
  return _val;
 }
 
+
 /*Функция считвание значение и применение его при прошествии времени*/
-uint8_t change_val(uint8_t val) {
-  cur_time=millis();
-  if (val!=prev_val) {
-    //prev_val=val;
-    prev_time=cur_time;
-    prev_val=val;
-    return val;
+/*
+uint8_t change_val(uint8_t val) {  
+  if (blink_temp.blink(100)) {
+    write_display_temp(val);
   } else {
-    if (cur_time-prev_time>400) {
-      return val;
-    }
+    display_hide(1);
   }
-  
-  
-}
+} */
 
 
 /*
