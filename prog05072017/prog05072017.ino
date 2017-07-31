@@ -16,7 +16,7 @@
 #define dac4 0x2F // последний DAC
 
 /*Датчик температуры*/
-DHT dht(8, DHT22);
+DHT dht(A1, DHT22);
 /*Замер скорости работы программы*/
 uint16_t prev_millis_speed = 0; // предыдущее время
 uint16_t cur_millis_speed = 0; // текущее время
@@ -30,17 +30,29 @@ byte encoder_A_port = 'D'; // Порт вывода А
 byte encoder_A_pin = 6; // Пин вывода А
 byte encoder_B_port = 'D'; // Порт вывода B
 byte encoder_B_pin = 7; // Пин вывода B
+bool enc_init=false; //Регистр вращения энкодера
 
 /*Считывание датчик температуры */
 byte count_cycle_temp = 0;
 
+/*Таймер мигания дисплея*/
+timer_radar blink_disp(2);
 
-timer_radar blink_temp(2);
+/* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////
+
+
 timer_radar mytime(2);
 
 float t = 20;
-int t1;
+float f, f1=7;
 
+
+bool f_init;
+
+int time_prev;
+int time_cur;
+
+/**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup(){
   Serial.begin(115200); // скорость com-порта
@@ -50,17 +62,39 @@ void setup(){
   pinMode(7, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
   /*Установка пинов датчика температуры*/
   pinMode(8, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
+
+/*Временные установки*/
+
 }
 
 void loop(){
   /*Замер скорости работы программы*/
   prev_millis_speed = millis(); // время на начало программы
   /************************************/
- 
-  t=encoder_read(t, 1);
-  change_val(t);
+  
+  
+  f=encoder_read(f, 0.5);
+  
+  //change_val();
 
-  //write_display_temp(t);
+  /*
+  if (enc_init==true) {
+    f_init=true;
+    time_prev=millis();
+  }
+
+  if (f_init==false) {
+     write_display_temp(temp_metr(100));
+  }
+
+  if (f_init==true) { //если сработал регистр
+    if (millis()-time_prev>700) { //если прошло время
+      write_display_temp(temp_metr(100));
+    } else {                      //если не прошло время
+      display_blink(f);
+    }
+  } */
+
   //seg7_write(0x20, t, 0);
   //temp_metr(1);
   //dac_write(dac1, 27);
@@ -69,9 +103,8 @@ void loop(){
 
 
   /*Замер скорости работы программы*/
-  cur_millis_speed = millis(); // время на конец программы
-  //Serial.println(cur_millis_speed - prev_millis_speed);
- // Serial.println(timer_my()); // вывод времени исполнения программы
+  //cur_millis_speed = millis(); // время на конец программы
+  //Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы
   
   /************************************/
 }
@@ -198,12 +231,21 @@ void display_hide(byte init){
     }
  }
 
+//Мигание дисплея. Принимает значение выводимое на дисплей
+void display_blink(float val) {
+  if (blink_disp.blink(50)) {     //Частота мерцания
+      write_display_temp(val);
+  } else {
+      display_hide(1);
+  }
+}
+
 /*Функция вывода температуры на семисегментный дисплей*/
 //Принимает значение температуры float
 void write_display_temp(float val) {
   float _fraction = (val - ((int)val))*10; //вычисление дробной части
   //если значение меньше -10
-  if (val<-10) {
+  if (val<=-10) {
     seg7_write(pcf1,'-',0);                 //в первый разряд -
     seg7_write(pcf2, abs (val / 10), 0);    //второй разряд первая цифра
     seg7_write(pcf3, abs ((int)val % 10), 1); //третий разряд вторая цифра
@@ -268,8 +310,7 @@ void write_display_rpm(uint16_t val){
 float encoder_read(float init_value, float k){
   float _count = 0;
   // выбор пина A
-  switch (encoder_B_port)
-  {
+  switch (encoder_B_port) {
     case 'B':
       _A = bitRead(PINB, encoder_A_pin);
       break;
@@ -281,8 +322,7 @@ float encoder_read(float init_value, float k){
       break;
   }
   // выбор пина B
-  switch (encoder_B_port)
-  {
+  switch (encoder_B_port) {
     case 'B':
       _B = bitRead(PINB, encoder_B_pin);
       break;
@@ -298,13 +338,16 @@ float encoder_read(float init_value, float k){
   {
     if (_B != _A)
     {
-      _count = _count + k;
+      _count = _count + k; 
+      enc_init=true;      //регистр врщения энкодера
     }
     else
     {
-      _count = _count - k;
+      _count = _count - k; 
+      enc_init=true;      //регистр вращения энкодера
     }
-  }
+  } else {enc_init=false;}
+
   _pinLast = _A; // Присваеваем последнее значение A
   return init_value + _count; // Возвращаем изменённое значение
 }
@@ -344,14 +387,22 @@ byte read_pcf(byte addr, byte pcf_byte) {
 
 
 /*Функция считвание значение и применение его при прошествии времени*/
-/*
-uint8_t change_val(uint8_t val) {  
-  if (blink_temp.blink(100)) {
-    write_display_temp(val);
-  } else {
+
+uint8_t change_val() {  
+
+  if (enc_init=1) {
     display_hide(1);
   }
-} */
+
+  /*
+  if (blink_temp.blink(100)) {
+     write_display_temp(f);
+    } else {
+     display_hide(1);
+  } */
+  
+
+} 
 
 
 /*
