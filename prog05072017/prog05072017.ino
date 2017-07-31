@@ -38,18 +38,23 @@ byte count_cycle_temp = 0;
 /*Таймер мигания дисплея*/
 timer_radar blink_disp(2);
 
+/*Функция change_val*/
+bool change_enc_init;       // регистр функции change_val
+uint16_t change_time_prev;  // для запоминания времени
+
+
 /* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////
 
 
 timer_radar mytime(2);
 
-float t = 20;
-float f, f1=7;
+float t = 20; //текущая температура
+
+float t1=25; //желаемая температура
 
 
-bool f_init;
 
-int time_prev;
+
 int time_cur;
 
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -73,27 +78,10 @@ void loop(){
   /************************************/
   
   
-  f=encoder_read(f, 0.5);
-  
-  //change_val();
+  t1=encoder_read(t1, 0.5);
+  //t=temp_metr(100);
+  change_val(t, t1, 1);
 
-  /*
-  if (enc_init==true) {
-    f_init=true;
-    time_prev=millis();
-  }
-
-  if (f_init==false) {
-     write_display_temp(temp_metr(100));
-  }
-
-  if (f_init==true) { //если сработал регистр
-    if (millis()-time_prev>700) { //если прошло время
-      write_display_temp(temp_metr(100));
-    } else {                      //если не прошло время
-      display_blink(f);
-    }
-  } */
 
   //seg7_write(0x20, t, 0);
   //temp_metr(1);
@@ -231,10 +219,10 @@ void display_hide(byte init){
     }
  }
 
-//Мигание дисплея. Принимает значение выводимое на дисплей
-void display_blink(float val) {
+//Мигание дисплея. Принимает значение выводимое на дисплей и вид измерения (false - температура, true - обороты)
+void display_blink(float val, bool init) {
   if (blink_disp.blink(50)) {     //Частота мерцания
-      write_display_temp(val);
+      init ? write_display_temp(val) : write_display_rpm ((int)val);
   } else {
       display_hide(1);
   }
@@ -385,23 +373,23 @@ byte read_pcf(byte addr, byte pcf_byte) {
  return _val;
 }
 
-
-/*Функция считвание значение и применение его при прошествии времени*/
-
-uint8_t change_val() {  
-
-  if (enc_init=1) {
-    display_hide(1);
+/*Функция мигания дисплея во время выбора значения*/
+// сur_val - текущее значение, dis_val - выбранное значение, init - вид измерения (false - температура, true - обороты)
+uint8_t change_val(float cur_val, float dis_val, bool init) {  
+  if (enc_init==true) {           //Если сработад энкодер
+    change_enc_init=true;        //пишем регистр
+    change_time_prev=millis();   //запоминаем время
   }
 
-  /*
-  if (blink_temp.blink(100)) {
-     write_display_temp(f);
-    } else {
-     display_hide(1);
-  } */
-  
-
+  if (change_enc_init==true) {                                                           //если сработал регистр
+    if (millis()-change_time_prev>700) {                                               //если прошло время
+      init ? write_display_temp(cur_val) : write_display_rpm ((int)cur_val);    //выводим текущие показания
+    } else {                                                                    //если не прошло время
+      display_blink(dis_val, init);                                             //мигаем дисплеем
+    }
+  } else {                                                                      //если регистр не сработал выводим текщие показания
+    init ? write_display_temp(cur_val): write_display_rpm ((int)cur_val);
+  }
 } 
 
 
