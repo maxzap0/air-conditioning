@@ -16,7 +16,9 @@
 #define dac4 0x2F // последний DAC
 
 /*Датчик температуры*/
-DHT dht(A1, DHT22);
+DHT dht(A1, DHT22); //ДТ1
+DHT dht2(A2, DHT22); //ДТ2
+
 /*Замер скорости работы программы*/
 uint16_t prev_millis_speed = 0; // предыдущее время
 uint16_t cur_millis_speed = 0; // текущее время
@@ -49,7 +51,6 @@ uint16_t change_time_prev;  // для запоминания времени
 timer_radar mytime(2);
 
 float t = 20; //текущая температура
-
 float t1=25; //желаемая температура
 
 
@@ -82,12 +83,7 @@ void loop(){
   //t=temp_metr(100);
   change_val(t, t1, 1);
 
-
-  //seg7_write(0x20, t, 0);
-  //temp_metr(1);
-  //dac_write(dac1, 27);
-  //t=dht.readTemperature();
-  //read_pcf(pcf5, 4);
+  Serial.println(temp_metr(50, 0));
 
 
   /*Замер скорости работы программы*/
@@ -341,12 +337,12 @@ float encoder_read(float init_value, float k){
 }
 
 /*Считывание датчика температуры определённое количество циклов*/
-// Принимает колличество циклов, возвращает показние термометра
-float temp_metr(uint16_t cycle){
+// Принимает колличество циклов, и номер датчика (1-основной, 0 - дополнительный) возвращает показние термометра
+float temp_metr(uint16_t cycle, bool dht_numb){
   if (count_cycle_temp > cycle)
   {
-    // если прошло больше циклов cчитываем значение, если нет, инкремент счётчика
-    return dht.readTemperature();
+    // если прошло больше циклов cчитываем значение с определённого датчика, если нет, инкремент счётчика
+    return dht_numb ? dht.readTemperature() : dht2.readTemperature();
     count_cycle_temp = 0;
   }
   else
