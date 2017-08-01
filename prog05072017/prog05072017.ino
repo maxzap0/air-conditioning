@@ -389,7 +389,7 @@ uint8_t change_val(float cur_val, float dis_val, bool init) {
 } 
 
 
-/***************
+/**234567890-
 Sketch uses 5,916 bytes (19.3%) of program storage space. Maximum is 30,720 bytes.
 Global variables use 425 bytes (20.8%) of dynamic memory, leaving 1,623 bytes for local variables. Maximum is 2,048 bytes.
 */
