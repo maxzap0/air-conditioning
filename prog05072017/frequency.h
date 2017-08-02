@@ -5,7 +5,7 @@
 #include <avr/interrupt.h>
 
 #define	PORT_Freq	PINC		//Порт вентилятора 
-#define	PIN_Freq	1			//Порт вентилятора
+#define	PIN_Freq	1			//Порт вентилятора 
 
 volatile unsigned int g_seconds = 0;
 
