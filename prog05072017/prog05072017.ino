@@ -81,8 +81,8 @@ void loop(){
   //t=temp_metr(100);
   change_val(t, t1, 1);
 
-  Serial.println(temp_metr(50, 0));
-
+  //Serial.println(read_dip());
+  //Serial.println(read_pcf(pcf5, 4));
 
   /*Замер скорости работы программы*/
   //cur_millis_speed = millis(); // время на конец программы
@@ -90,12 +90,10 @@ void loop(){
   
   /************************************/
 }
-
 /*
-byte read_choise () {
-
-  return read_pcf(5);
-}*/
+byte read_dip () {
+  return read_pcf(pcf5, 1);
+} */
 
 /*Функция вывода на 7seg дисплей */
 // Формат seg7_write(адрес, значение, точка)
@@ -396,4 +394,5 @@ uint8_t change_val(float cur_val, float dis_val, bool init) {
 Sketch uses 5,916 bytes (19.3%) of program storage space. Maximum is 30,720 bytes.
 Global variables use 425 bytes (20.8%) of dynamic memory, leaving 1,623 bytes for local variables. Maximum is 2,048 bytes.
 max222
+max1
 */
