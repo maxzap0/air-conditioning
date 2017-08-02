@@ -7,7 +7,7 @@
 #define pcf2 0x21 //
 #define pcf3 0x22 //
 #define pcf4 0x23 // последний сегмент индикатора
-#define pcf5 0x24 // 
+#define pcf5 0x24 // ДИПы
 #define pcf6 0x25 // 
 
 #define dac1 0x2C // первый DAC
@@ -54,8 +54,6 @@ float t = 20; //текущая температура
 float t1=25; //желаемая температура
 
 
-
-
 int time_cur;
 
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -92,6 +90,12 @@ void loop(){
   
   /************************************/
 }
+
+/*
+byte read_choise () {
+
+  return read_pcf(5);
+}*/
 
 /*Функция вывода на 7seg дисплей */
 // Формат seg7_write(адрес, значение, точка)
@@ -387,7 +391,6 @@ uint8_t change_val(float cur_val, float dis_val, bool init) {
     init ? write_display_temp(cur_val): write_display_rpm ((int)cur_val);
   }
 } 
-
 
 /**234567890-
 Sketch uses 5,916 bytes (19.3%) of program storage space. Maximum is 30,720 bytes.
