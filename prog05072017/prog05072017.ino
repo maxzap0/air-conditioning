@@ -15,6 +15,9 @@
 #define dac3 0x2E //
 #define dac4 0x2F // последний DAC
 
+//режим настройки вентиляторов
+#define time_set 500 // время, через которое будет записываться в eeprom
+
 /*Датчик температуры*/
 DHT dht(A1, DHT22); //ДТ1
 DHT dht2(A2, DHT22); //ДТ2
@@ -43,10 +46,13 @@ timer_radar blink_disp(2);
 /*Функция change_val*/
 bool change_enc_init;       // регистр функции change_val
 uint16_t change_time_prev;  // для запоминания времени
+bool change_val_int;        // регистр функции change_val
 
+/*Переменные режима настройки параметров*/
+uint16_t rpm_1_cold; //первый холодный вентилятор текущее значение
+uint16_t rpm_1_cold_change;
 
-/* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////
-
+/* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////  
 
 timer_radar mytime(2);
 
@@ -54,7 +60,10 @@ float t = 20; //текущая температура
 float t1=25; //желаемая температура
 
 
-int time_cur;
+int eeprom_temp;
+int time_set_cur;
+int time_set_prev; 
+bool set_time_reg=false;
 
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -67,8 +76,9 @@ void setup(){
   /*Установка пинов датчика температуры*/
   pinMode(8, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
 
-/*Временные установки*/
+/*Временные установки*//////////////////////////////////////////////////////////////////////////////////////////
 
+ 
 }
 
 void loop(){
@@ -76,13 +86,38 @@ void loop(){
   prev_millis_speed = millis(); // время на начало программы
   /************************************/
   
-  
-  t1=encoder_read(t1, 0.5);
-  //t=temp_metr(100);
-  change_val(t, t1, 1);
+  //Считывание режима dip переключаталей и переход в нужный режим
+  /*
+  switch (read_dip()) {
+      case 15 :  //Рабочий режим
+         
+        break;
+      case 14 : //настройка 1го холодного вентилятора
 
+          rpm_1_cold=EEPROM.read(1);
+
+          rpm_1_cold_change=encoder_read(rpm_1_cold_change, 1);
+           if (change_val(rpm_1_cold, rpm_1_cold_change, 0)) {
+            Serial.println("YEAH!");
+           }
+
+          //Serial.println(EEPROM.read(1));
+
+      break;
+      case 13:
+                //настройка 2го холодного вентилятора
+      break;
+
+     default :
+     ;
+  } 
+
+*/
+
+  //t1=encoder_read(t1, 0.5);
+  //change_val(t, t1, 1);
+  //t=temp_metr(100);
   //Serial.println(read_dip());
-  //Serial.println(read_pcf(pcf5, 4));
 
   /*Замер скорости работы программы*/
   //cur_millis_speed = millis(); // время на конец программы
@@ -90,10 +125,12 @@ void loop(){
   
   /************************************/
 }
-/*
+
+/*Функция считывания значений dip-переключателей, возвращает значение dip-переключателей*/
 byte read_dip () {
-  return read_pcf(pcf5, 1);
-} */
+  return (0b1111 & read_pcf(pcf5)); //считываем первые четыре байта pcf
+  //
+}  
 
 /*Функция вывода на 7seg дисплей */
 // Формат seg7_write(адрес, значение, точка)
@@ -361,10 +398,10 @@ void dac_write(uint8_t addr, uint16_t val) { //Принимает адрес и 
 }
 
 /*Функция считывания переключателей*/  //принимает адрес pcf и колличество считаных бит, возвращает считаный байт
-byte read_pcf(byte addr, byte pcf_byte) {
+byte read_pcf(int addr) {
  byte _val;
-  Wire.requestFrom(addr, pcf_byte);    //запрос на чтение адре, кол-во байт
-   while(Wire.available())            //если ечть что читать
+  Wire.requestFrom(addr, 8);    //запрос на чтение адреc, кол-во байт. Колличество байт не работает(
+   while(Wire.available())            //если еcть что читать
    {                                  //читаем
      _val = Wire.read();    
    }
@@ -372,8 +409,8 @@ byte read_pcf(byte addr, byte pcf_byte) {
 }
 
 /*Функция мигания дисплея во время выбора значения*/
-// сur_val - текущее значение, dis_val - выбранное значение, init - вид измерения (false - температура, true - обороты)
-uint8_t change_val(float cur_val, float dis_val, bool init) {  
+// Отдаёт true, когда дисплей перестаёт мигать сur_val - текущее значение, dis_val - выбранное значение, init - вид измерения (true - температура, false - обороты)
+bool change_val(float cur_val, float dis_val, bool init) {
   if (enc_init==true) {           //Если сработад энкодер
     change_enc_init=true;        //пишем регистр
     change_time_prev=millis();   //запоминаем время
@@ -382,18 +419,21 @@ uint8_t change_val(float cur_val, float dis_val, bool init) {
   if (change_enc_init==true) {                                                           //если сработал регистр
     if (millis()-change_time_prev>700) {                                               //если прошло время
       init ? write_display_temp(cur_val) : write_display_rpm ((int)cur_val);    //выводим текущие показания
+      if (change_val_int==true) {                                                         //регистр, для вывода значенияфункции один раз
+        change_val_int=false;                                                             //меняем регистр
+        return true;                                                            //функция отдаёт true один раз
+      }
     } else {                                                                    //если не прошло время
-      display_blink(dis_val, init);                                             //мигаем дисплеем
+      display_blink(dis_val, init);
+      change_val_int=true;                                             //мигаем дисплеем
     }
   } else {                                                                      //если регистр не сработал выводим текщие показания
     init ? write_display_temp(cur_val): write_display_rpm ((int)cur_val);
   }
+  return false;                                                                  //всё вермя отдаём false
 } 
 
-/**234567890-
-Sketch uses 5,916 bytes (19.3%) of program storage space. Maximum is 30,720 bytes.
-Global variables use 425 bytes (20.8%) of dynamic memory, leaving 1,623 bytes for local variables. Maximum is 2,048 bytes.
-max222
-max1
-max3
+/*
+Sketch uses 7,456 bytes (24.3%) of program storage space. Maximum is 30,720 bytes.
+Global variables use 550 bytes (26.9%) of dynamic memory, leaving 1,498 bytes for local variables. Maximum is 2,048 bytes.
 */
