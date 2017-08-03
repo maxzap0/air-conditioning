@@ -17,6 +17,7 @@
 
 //режим настройки вентиляторов
 #define time_set 500 // время, через которое будет записываться в eeprom
+#define max_rpm 2500 //максимальные обороты вентилятора
 
 /*Датчик температуры*/
 DHT dht(A1, DHT22); //ДТ1
@@ -76,6 +77,11 @@ void setup(){
   /*Установка пинов датчика температуры*/
   pinMode(8, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
 
+  /*Считывание первоначальных значение EEPROM*/
+  //значение rpm первого холодного вентилятора
+  rpm_1_cold_change = eeprom_read_rpm(1); 
+  rpm_1_cold=eeprom_read_rpm(1);
+
 /*Временные установки*//////////////////////////////////////////////////////////////////////////////////////////
 
  
@@ -86,22 +92,19 @@ void loop(){
   prev_millis_speed = millis(); // время на начало программы
   /************************************/
   
-  //Считывание режима dip переключаталей и переход в нужный режим
   /*
+  //Считывание режима dip переключаталей и переход в нужный режим
   switch (read_dip()) {
       case 15 :  //Рабочий режим
          
         break;
       case 14 : //настройка 1го холодного вентилятора
 
-          rpm_1_cold=EEPROM.read(1);
-
-          rpm_1_cold_change=encoder_read(rpm_1_cold_change, 1);
+          rpm_1_cold_change=encoder_read(rpm_1_cold_change, 10);
            if (change_val(rpm_1_cold, rpm_1_cold_change, 0)) {
-            Serial.println("YEAH!");
+             eeprom_write_rpm(1, rpm_1_cold_change);
+             rpm_1_cold=rpm_1_cold_change;
            }
-
-          //Serial.println(EEPROM.read(1));
 
       break;
       case 13:
@@ -112,7 +115,7 @@ void loop(){
      ;
   } 
 
-*/
+  */
 
   //t1=encoder_read(t1, 0.5);
   //change_val(t, t1, 1);
@@ -124,6 +127,18 @@ void loop(){
   //Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы
   
   /************************************/
+}
+
+/*Функция чтения оборотов из памяти. Читает из памяти с адресом (add) байт и преобразует его в кол-во оборотов*/
+int eeprom_read_rpm (int addr) {
+  Serial.println(   (int) ( (float)  EEPROM.read(addr)/250*max_rpm  )  );
+  //
+}
+
+/*Функция записи оборотов в память. Записывает кол-во оборотов в память с адресом addr*/
+void eeprom_write_rpm (int addr, int val) {
+   EEPROM.write(addr,   (int)  ((float) val/max_rpm*250) );
+   //
 }
 
 /*Функция считывания значений dip-переключателей, возвращает значение dip-переключателей*/
