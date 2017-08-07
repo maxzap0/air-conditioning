@@ -15,6 +15,11 @@
 #define dac3 0x2E //
 #define dac4 0x2F // последний DAC
 
+#define A_PORT PIND //Порт ножки A энкодера
+#define A_pin 6     //Пин ножки А энкодера
+#define B_PORT PIND //Порт ножки B энкодера
+#define B_pin 7     //Пин ножки B энкодера
+
 /*Датчик температуры*/
 DHT dht(A1, DHT22); //ДТ1
 DHT dht2(A2, DHT22); //ДТ2
@@ -25,13 +30,9 @@ uint16_t cur_millis_speed = 0; // текущее время
 uint16_t time_millis = 0; // время прошедшее после включения
 
 /*Работа энкодера*/
-byte _A = 1; // Первоначальное сосояние A
-byte _B = 1; // Первоначальное состояние B
-byte _pinLast = 1; // Служебная переменная
-byte encoder_A_port = 'D'; // Порт вывода А
-byte encoder_A_pin = 6; // Пин вывода А
-byte encoder_B_port = 'D'; // Порт вывода B
-byte encoder_B_pin = 7; // Пин вывода B
+byte A = 1; // Первоначальное сосояние A
+byte B = 1; // Первоначальное состояние B
+byte pinLast = 1; // Служебная переменная
 bool enc_init=false; //Регистр вращения энкодера
 
 /*Считывание датчик температуры */
@@ -43,20 +44,15 @@ timer_radar blink_disp(2);
 /*Функция change_val*/
 bool change_enc_init;       // регистр функции change_val
 uint16_t change_time_prev;  // для запоминания времени
+bool change_val_int;        // регистр функции change_val
+
+/*Переменные оборотов вентилятора*/
+uint16_t rpm_1_cold; //первый холодный вентилятор, текущее значение оборотов
+uint16_t rpm_1_cold_dac; //Значение выдаваемое на dac первого холодного венттидятора
+uint16_t rpm_2_cold;      //второй холодный вентилятор, текущее значение оборотов
+uint16_t rpm_2_cold_dac; //Значение выдаваемое на dac второго холодного венттидятора
 
 
-/* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////
-
-
-
-
-timer_radar mytime(2);
-
-float t = 20; //текущая температура
-float t1=25; //желаемая температура
-
-
-int time_cur;
 
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -69,8 +65,12 @@ void setup(){
   /*Установка пинов датчика температуры*/
   pinMode(8, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
 
-/*Временные установки*/
+  /*Считывание первоначальных значение EEPROM*/
+  rpm_1_cold_dac = EEPROM.read(1); //значение rpm первого холодного вентилятора
+  rpm_2_cold_dac = EEPROM.read(2); //значение rpm второго холодного вентилятора
 
+/*Временные установки*//////////////////////////////////////////////////////////////////////////////////////////
+ 
 }
 
 void loop(){
@@ -78,13 +78,21 @@ void loop(){
   prev_millis_speed = millis(); // время на начало программы
   /************************************/
   
-  
-  t1=encoder_read(t1, 0.5);
-  //t=temp_metr(100);
-  change_val(t, t1, 1);
+  //Считывание режима dip переключаталей и переход в нужный режим
+  switch (read_dip()) {
+      case 15 :  //Рабочий режим
+         
+        break;
+      case 14 : //настройка 1го холодного вентилятора
+        fan_setting1();  
+      break;
+      case 13:  //настройка 2го холодного вентилятора
+        fan_setting2();
+      break;
 
-  //Serial.println(read_dip());
-  //Serial.println(read_pcf(pcf5, 4));
+     default :
+     ;
+  } 
 
   /*Замер скорости работы программы*/
   //cur_millis_speed = millis(); // время на конец программы
@@ -92,10 +100,40 @@ void loop(){
   
   /************************************/
 }
-/*
+
+/*Функция настройки вентилятора первого холодного*/
+void fan_setting1 () {
+  rpm_1_cold_dac=encoder_read(rpm_1_cold_dac, 1);       //Если крутим энкодер меняем значение dac
+  if (rpm_1_cold_dac>255) {                             //Защита от выхода за пределы значений dac
+    rpm_1_cold_dac=255;
+  } else if (rpm_1_cold_dac<1) {
+    rpm_1_cold_dac=1;
+  }
+  if (change_val(rpm_1_cold, rpm_1_cold_dac, 0)) {      //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
+    EEPROM.write(1, rpm_1_cold_dac);                    //Пишем значение в EEPROM
+  }
+  dac_write(dac1, rpm_1_cold_dac);                      //Вывод текущего значения на dac
+}
+
+/*Функция настройки вентилятора второго холодного*/
+void fan_setting2 () {
+  rpm_2_cold_dac=encoder_read(rpm_2_cold_dac, 1);       //Если крутим энкодер меняем значение dac
+  if (rpm_2_cold_dac>255) {                             //Защита от выхода за пределы значений dac
+    rpm_2_cold_dac=255;
+  } else if (rpm_2_cold_dac<1) {
+    rpm_2_cold_dac=1;
+  }
+  if (change_val(rpm_2_cold, rpm_2_cold_dac, 0)) {      //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
+    EEPROM.write(2, rpm_2_cold_dac);                    //Пишем значение в EEPROM
+  }
+  dac_write(dac2, rpm_2_cold_dac);                      //Вывод текущего значения на dac
+}
+
+/*Функция считывания значений dip-переключателей, возвращает значение dip-переключателей*/
 byte read_dip () {
-  return read_pcf(pcf5, 1);
-} */
+  return (0b1111 & read_pcf(pcf5)); //считываем первые четыре байта pcf
+  //
+}  
 
 /*Функция вывода на 7seg дисплей */
 // Формат seg7_write(адрес, значение, точка)
@@ -297,34 +335,14 @@ void write_display_rpm(uint16_t val){
 // Принимает значение и возвращает ++ или -- этого значения, k - значение прибавляемое/убавляемое
 float encoder_read(float init_value, float k){
   float _count = 0;
-  // выбор пина A
-  switch (encoder_B_port) {
-    case 'B':
-      _A = bitRead(PINB, encoder_A_pin);
-      break;
-    case 'C':
-      _A = bitRead(PINC, encoder_A_pin);
-      break;
-    case 'D':
-      _A = bitRead(PIND, encoder_A_pin);
-      break;
-  }
-  // выбор пина B
-  switch (encoder_B_port) {
-    case 'B':
-      _B = bitRead(PINB, encoder_B_pin);
-      break;
-    case 'C':
-      _B = bitRead(PINC, encoder_B_pin);
-      break;
-    case 'D':
-      _B = bitRead(PIND, encoder_B_pin);
-      break;
-  }
+  //Считываем состояние ножек энкодера
+  A = bitRead (A_PORT, A_pin);
+  B = bitRead (B_PORT, B_pin);
+
   // Если А изменил состояние первым то прибавляем, в противном случает убавляем
-  if (_A != _pinLast)
+  if (A != pinLast)
   {
-    if (_B != _A)
+    if (B != A)
     {
       _count = _count + k; 
       enc_init=true;      //регистр врщения энкодера
@@ -336,7 +354,7 @@ float encoder_read(float init_value, float k){
     }
   } else {enc_init=false;}
 
-  _pinLast = _A; // Присваеваем последнее значение A
+  pinLast = A; // Присваеваем последнее значение A
   return init_value + _count; // Возвращаем изменённое значение
 }
 
@@ -363,10 +381,10 @@ void dac_write(uint8_t addr, uint16_t val) { //Принимает адрес и 
 }
 
 /*Функция считывания переключателей*/  //принимает адрес pcf и колличество считаных бит, возвращает считаный байт
-byte read_pcf(byte addr, byte pcf_byte) {
+byte read_pcf(int addr) {
  byte _val;
-  Wire.requestFrom(addr, pcf_byte);    //запрос на чтение адре, кол-во байт
-   while(Wire.available())            //если ечть что читать
+  Wire.requestFrom(addr, 8);    //запрос на чтение адреc, кол-во байт. Колличество байт не работает(
+   while(Wire.available())            //если еcть что читать
    {                                  //читаем
      _val = Wire.read();    
    }
@@ -374,8 +392,8 @@ byte read_pcf(byte addr, byte pcf_byte) {
 }
 
 /*Функция мигания дисплея во время выбора значения*/
-// сur_val - текущее значение, dis_val - выбранное значение, init - вид измерения (false - температура, true - обороты)
-uint8_t change_val(float cur_val, float dis_val, bool init) {  
+// Отдаёт true, когда дисплей перестаёт мигать сur_val - текущее значение, dis_val - выбранное значение, init - вид измерения (true - температура, false - обороты)
+bool change_val(float cur_val, float dis_val, bool init) {
   if (enc_init==true) {           //Если сработад энкодер
     change_enc_init=true;        //пишем регистр
     change_time_prev=millis();   //запоминаем время
@@ -384,18 +402,23 @@ uint8_t change_val(float cur_val, float dis_val, bool init) {
   if (change_enc_init==true) {                                                           //если сработал регистр
     if (millis()-change_time_prev>700) {                                               //если прошло время
       init ? write_display_temp(cur_val) : write_display_rpm ((int)cur_val);    //выводим текущие показания
+      if (change_val_int==true) {                                                         //регистр, для вывода значенияфункции один раз
+        change_val_int=false;                                                             //меняем регистр
+        return true;                                                            //функция отдаёт true один раз
+      }
     } else {                                                                    //если не прошло время
-      display_blink(dis_val, init);                                             //мигаем дисплеем
+      display_blink(dis_val, init);
+      change_val_int=true;                                             //мигаем дисплеем
     }
   } else {                                                                      //если регистр не сработал выводим текщие показания
     init ? write_display_temp(cur_val): write_display_rpm ((int)cur_val);
   }
+  return false;                                                                  //всё вермя отдаём false
 } 
 
-/**234567890-
-Sketch uses 5,916 bytes (19.3%) of program storage space. Maximum is 30,720 bytes.
-Global variables use 425 bytes (20.8%) of dynamic memory, leaving 1,623 bytes for local variables. Maximum is 2,048 bytes.
-max222
-max1
-max3
+/*
+Sketch uses 7,456 bytes (24.3%) of program storage space. Maximum is 30,720 bytes.
+Global variables use 550 bytes (26.9%) of dynamic memory, leaving 1,498 bytes for local variables. Maximum is 2,048 bytes.
+
+
 */
