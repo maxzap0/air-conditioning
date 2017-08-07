@@ -7,16 +7,15 @@
 volatile unsigned int g_seconds = 0;
 volatile unsigned int g_period = 0;
 
-
-#define PIN1_freq PINC1
-#define PIN2_freq PINC2
-#define PIN3_freq PINC3
-#define PIN4_freq PINC4
-
-#define PORT1_freq PINC
-#define PORT2_freq PINC
-#define PORT3_freq PINC
+#define PORT1_freq PINB
+#define PORT2_freq PIND
+#define PORT3_freq PINB
 #define PORT4_freq PINC
+
+#define PIN1_freq PINC4
+#define PIN2_freq PINC4
+#define PIN3_freq PINC5
+#define PIN4_freq PINC0
 
 
 //Настройка на подсчет секунд глобальной переменной g_seconds
