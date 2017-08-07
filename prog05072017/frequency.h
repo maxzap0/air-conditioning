@@ -7,15 +7,9 @@
 volatile unsigned int g_seconds = 0;
 volatile unsigned int g_period = 0;
 
-#define PORT1_freq PINB
-#define PORT2_freq PIND
-#define PORT3_freq PINB
+//PIN1
 #define PORT4_freq PINC
 
-#define PIN1_freq PINC4
-#define PIN2_freq PINC4
-#define PIN3_freq PINC5
-#define PIN4_freq PINC0
 
 
 //Настройка на подсчет секунд глобальной переменной g_seconds
@@ -196,7 +190,7 @@ void freq(int* frequency[], unsigned int time_start, unsigned int time_metering)
 		}
 		
 		//PIN1
-		real[0] = (PORT1 & (1<<(PIN1-1)));
+		real[0] = (PORT1_freq & (1<<(PIN1_freq)));
 		if (real[0] != prev[0])
 		{
 			*frequency[0]=*frequency[0]+1;
@@ -204,7 +198,7 @@ void freq(int* frequency[], unsigned int time_start, unsigned int time_metering)
 		prev[0] = real[0];
 		
 		//PIN1
-		real[1] = (PORT2 & (1<<(PIN2-1)));
+		real[1] = (PORT2_freq & (1<<(PIN2_freq)));
 		if (real[1] != prev[1])
 		{
 			*frequency[1]=*frequency[1]+1;
@@ -212,7 +206,7 @@ void freq(int* frequency[], unsigned int time_start, unsigned int time_metering)
 		prev[1] = real[1];
 		
 		//PIN2
-		real[2] = (PORT3 & (1<<(PIN3-1)));
+		real[2] = (PORT3_freq & (1<<(PIN3_freq)));
 		if (real[2] != prev[2])
 		{
 			*frequency[2]=*frequency[2]+1;
@@ -220,7 +214,7 @@ void freq(int* frequency[], unsigned int time_start, unsigned int time_metering)
 		prev[2] = real[2];
 		
 		//PIN3
-		real[3] = (PORT4 & ((1<<PIN4-1)));
+		real[3] = (PORT4_freq & ((1<<PIN4_freq)));
 		if (real[3] != prev[3])
 		{
 			*frequency[3]=*frequency[3]+1;
