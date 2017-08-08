@@ -1,0 +1,15 @@
+######################
+# class              #
+######################
+
+timer_radar	KEYWORD2
+
+######################
+# void               #
+######################
+
+start	KEYWORD2
+blink	KEYWORD2
+one_start	KEYWORD2
+init	KEYWORD2
+average	KEYWORD2
