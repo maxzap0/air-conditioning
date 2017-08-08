@@ -8,7 +8,21 @@ volatile unsigned int g_seconds = 0;
 volatile unsigned int g_period = 0;
 
 //PIN1
+#define PORT1_freq PINB
+#define PIN1_freq PINB4
+
+//PIN2
+#define PORT2_freq PIND
+#define PIN2_freq PIND4
+
+//PIN3
+#define PORT3_freq PINB
+#define PIN3_freq PINB5
+
+//PIN4
+
 #define PORT4_freq PINC
+#define PIN4_freq PINC0
 
 
 
