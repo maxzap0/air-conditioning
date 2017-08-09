@@ -4,12 +4,12 @@
 #include <Wire.h> //библиотека I2C
 #include "frequency.h"
 
-#define pcf1 0x20 // первый сегиент индикатора
-#define pcf2 0x21 //
-#define pcf3 0x22 //
-#define pcf4 0x23 // последний сегмент индикатора
-#define pcf5 0x24 // ДИПы
-#define pcf6 0x25 // 
+#define pcf1 0x38 // первый сегиент индикатора
+#define pcf2 0x39 //
+#define pcf3 0x3A //
+#define pcf4 0x3B // последний сегмент индикатора
+#define pcf5 0x3C // ДИПы
+#define pcf6 0x3D // 
 
 #define dac1 0x2C // первый DAC
 #define dac2 0x2D //
@@ -465,8 +465,6 @@ bool change_val(float cur_val, float dis_val, bool init) {
     change_enc_init=true;         //пишем регистр
     change_time_prev=millis();    //запоминаем время
   }
-
-  Serial.print(millis()-change_time_prev>700); Serial.print("--"); Serial.print(millis()); Serial.print("---"); Serial.println(change_time_prev);
 
   if (change_enc_init==true) {                                                  //если сработал регистр
     if (millis()-change_time_prev>700) {                                        //если прошло время                                        
