@@ -2,7 +2,7 @@
 #include <timer_radar.h>
 #include <DHT.h>
 #include <Wire.h> //библиотека I2C
-#include <frequency.h>
+#include "frequency.h"
 
 #define pcf1 0x20 // первый сегиент индикатора
 #define pcf2 0x21 //
@@ -43,9 +43,9 @@ byte count_cycle_temp = 0;
 timer_radar blink_disp(2);
 
 /*Функция change_val*/
-bool change_enc_init;       // регистр функции change_val
-uint16_t change_time_prev;  // для запоминания времени
-bool change_val_int;        // регистр функции change_val
+bool change_enc_init;                   // регистр функции change_val
+unsigned long int change_time_prev;     // для запоминания времени
+bool change_val_int;                    // регистр функции change_val
 
 /*Переменные оборотов вентилятора*/
 uint16_t rpm_1_cold;      //первый холодный вентилятор, текущее значение оборотов
@@ -84,7 +84,7 @@ void setup(){
   rpm_2_hot_dac = EEPROM.read(4);   //значение rpm первого горячего вентилятора
 
   /*Настройка измерителя чистоты*/
-  setup_TC1(20);
+  setup_TC1(4);
   for (i=0; i<4; i++) {rpm_fan[i]=&mass[i];}
 
  /*Временные установки*//////////////////////////////////////////////////////////////////////////////////////////
@@ -94,7 +94,7 @@ void setup(){
 void loop(){
 
   /*Замер скорости работы программы*/
-  prev_millis_speed = millis(); // время на начало программы
+  //prev_millis_speed = millis(); // время на начало программы
   /************************************/
 
   /*Считывание оборотов вентиляторов*/
@@ -103,6 +103,7 @@ void loop(){
   rpm_2_cold=*rpm_fan[3]; //второй холодный
   rpm_1_hot=*rpm_fan[0];  //первый горячий 
   rpm_2_hot=*rpm_fan[2];  //первый горячий
+ 
 
   //Считывание режима dip переключаталей и переход в нужный режим
   switch (read_dip()) {
@@ -110,7 +111,7 @@ void loop(){
          
         break;
       case 14 : //настройка 1го холодного вентилятора
-        fan_setting1();  
+        fan_setting1();
       break;
       case 13:  //настройка 2го холодного вентилятора
         fan_setting2();
@@ -132,11 +133,9 @@ void loop(){
      ;
   } 
 
-  
-
   /*Замер скорости работы программы*/
-  cur_millis_speed = millis(); // время на конец программы
-  Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы
+  //cur_millis_speed = millis(); // время на конец программы
+  //Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы
   
   /************************************/
 }
@@ -150,7 +149,7 @@ void fan_setting1 () {
     rpm_1_cold_dac=1;
   }
   if (change_val(rpm_1_cold, rpm_1_cold_dac, 0)) {      //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
-    EEPROM.write(1, rpm_1_cold_dac);                    //Пишем значение в EEPROM
+    EEPROM.write(1, rpm_1_cold_dac);                    //Пишем значение в EEPROM                
   }
   dac_write(dac1, rpm_1_cold_dac);                      //Вывод текущего значения на dac
 }
@@ -463,30 +462,30 @@ byte read_pcf(int addr) {
 // Отдаёт true, когда дисплей перестаёт мигать сur_val - текущее значение, dis_val - выбранное значение, init - вид измерения (true - температура, false - обороты)
 bool change_val(float cur_val, float dis_val, bool init) {
   if (enc_init==true) {           //Если сработад энкодер
-    change_enc_init=true;        //пишем регистр
-    change_time_prev=millis();   //запоминаем время
+    change_enc_init=true;         //пишем регистр
+    change_time_prev=millis();    //запоминаем время
   }
 
-  if (change_enc_init==true) {                                                           //если сработал регистр
-    if (millis()-change_time_prev>700) {                                               //если прошло время
+  Serial.print(millis()-change_time_prev>700); Serial.print("--"); Serial.print(millis()); Serial.print("---"); Serial.println(change_time_prev);
+
+  if (change_enc_init==true) {                                                  //если сработал регистр
+    if (millis()-change_time_prev>700) {                                        //если прошло время                                        
       init ? write_display_temp(cur_val) : write_display_rpm ((int)cur_val);    //выводим текущие показания
-      if (change_val_int==true) {                                                         //регистр, для вывода значенияфункции один раз
-        change_val_int=false;                                                             //меняем регистр
+      if (change_val_int==true) {                                               //регистр, для вывода значения функции один раз
+        change_val_int=false;                                                   //меняем регистр                                                   
         return true;                                                            //функция отдаёт true один раз
       }
     } else {                                                                    //если не прошло время
-      display_blink(dis_val, init);
-      change_val_int=true;                                             //мигаем дисплеем
+      display_blink(dis_val, init);                                             //мигаем дисплеем
+      change_val_int=true;                                                      
     }
   } else {                                                                      //если регистр не сработал выводим текщие показания
     init ? write_display_temp(cur_val): write_display_rpm ((int)cur_val);
   }
-  return false;                                                                  //всё вермя отдаём false
+  return false;                                                                 //всё вермя отдаём false
 } 
 
 /*
-Sketch uses 7,456 bytes (24.3%) of program storage space. Maximum is 30,720 bytes.
-Global variables use 550 bytes (26.9%) of dynamic memory, leaving 1,498 bytes for local variables. Maximum is 2,048 bytes.
 
 
 */
