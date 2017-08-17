@@ -23,6 +23,22 @@
 
 #define user_reg 60 //диапазон регулировки вентилятора пользователем
 #define user_reg_min 70 //Минимальный уровень скорости вентилятора для пользователя
+
+#define compressor1_port PORTD//Определение порта компрессора
+#define compressor1_pin 3
+#define compressor2_port PIND
+#define compressor2_pin 5
+
+#define button1_port PINB  //Определение кнопки компрессора
+#define button1_pin 0
+#define button2_port PINB  //Определение кнопки компрессора
+#define button2_pin 1
+
+#define thermostat_port PORTC//Определение порта термостата
+#define thermostat_pin 6
+
+#define time_fan 1500
+
 /*Датчик температуры*/
 DHT dht(A1, DHT22); //ДТ1
 DHT dht2(A2, DHT22); //ДТ2
@@ -73,14 +89,24 @@ bool low_press_2;   //реле низкого давления 2
 bool high_press_2;  //реле высокого давления 2
 
 /*Переменные рабочего режима*/
-bool indicator = true;      //выбор режима отображения. 1-температура 2-обороты
-byte user_rpm = 50;         //число оборотов вентиляторов в процентах для пользователя
-int user_rpm_k1;            //обороты вентилятора 1 прибавляемые/убавляемые пользователям
-int user_rpm_k2;            //обороты вентилятора 2 прибавляемые/убавляемые пользователям
+byte indicator = true;         //выбор режима отображения. 1-температура 2-обороты
+byte user_rpm = 50;            //число оборотов вентиляторов в процентах для пользователя
+int user_rpm_k1;               //обороты вентилятора 1 прибавляемые/убавляемые пользователям
+int user_rpm_k2;               //обороты вентилятора 2 прибавляемые/убавляемые пользователям
+float t_real;                  //температура реальная с датчика 1
+float t_wish=25;               //требуемая температура
+bool k1_button;                //кнопка первого компрессора 
+bool k2_button;                //кнопка второго компрессора
+bool k1_init;                  //разрешение на включение первого крмпрессора
+bool k2_init;                  //разрешение на включение первого крмпрессора
+bool k1_action;                //переменная работы первого компрессора
+bool k2_action;                //переменная работы второго компрессора
+bool temp_init;                //Хранит состояние термостата (нужно ли включить или нет)
+unsigned long fan1_last_time;  //Переменная хранения времени после работы вентилятора перед запуском компрессора
+bool fan1_time;                //Регистр прошедшего времени после работы первого вентилятора
+
 
 /* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////  
-
-
 
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
@@ -94,6 +120,9 @@ void setup(){
   pinMode(8, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
   /*Установка пина кнопки энкодера*/
   pinMode(A3, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
+  /*Установка портов компрессора как выходы*/
+  pinMode(3, OUTPUT);        //компрессор 1
+  pinMode(5, OUTPUT);        //компрессор 2
 
   /*Считывание первоначальных значение EEPROM*/
   rpm_1_cold_dac = EEPROM.read(1);  //значение rpm первого холодного вентилятора
@@ -102,7 +131,7 @@ void setup(){
   rpm_2_hot_dac = EEPROM.read(4);   //значение rpm первого горячего вентилятора
 
   /*Настройка измерителя чистоты*/
-  setup_TC1(4);
+  setup_TC1(20);
   for (i=0; i<4; i++) {rpm_fan[i]=&mass[i];}
 
  /*Временные установки*//////////////////////////////////////////////////////////////////////////////////////////
@@ -119,7 +148,7 @@ void loop(){
   read_relay();
 
   /*Считывание оборотов вентиляторов*/
-  freq(rpm_fan, 2, 1);
+  freq(rpm_fan, 5, 1);
   rpm_1_cold=*rpm_fan[1]; //первый холодный
   rpm_2_cold=*rpm_fan[3]; //второй холодный
   rpm_1_hot=*rpm_fan[0];  //первый горячий 
@@ -156,6 +185,9 @@ void loop(){
   /*Замер скорости работы программы*/
   //cur_millis_speed = millis(); // время на конец программы
   //Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы
+
+  
+/*  compressor1_port |=(k1_action<<compressor1_pin);*/
   
   /************************************/
 }
@@ -163,43 +195,120 @@ void loop(){
 /*Рабочий режим работы программы*/
 void work() {
 
-  bitRead(PINC, 3) ? indicator=true : indicator = false;              //Считывание значения переключателя 
+  bitRead(PINC, 3) ? indicator=1 : indicator = 2;   //Считывание значения переключателя 
 
-  dac_write(dac1, user_rpm_k1);                                        //Включение вентилторов
+  dac_write(dac1, user_rpm_k1);                            //Включение вентиляторов
   dac_write(dac2, user_rpm_k2);
   dac_write(dac3, rpm_1_hot_dac);
-  dac_write(dac4, rpm_2_hot_dac);
+  dac_write(dac4, rpm_2_hot_dac);  
 
-  switch (indicator) {                                                //Выбор режима: температура или обороты
-      case true:
-        user_rpm = encoder_read(user_rpm, 1);                         //Изменение значения оборотов
-        change_val(user_rpm,user_rpm, 0);                             //Индикация оборотов на дисплее
+  t_real=temp_metr(100, 1);                                      //считывание значение температуры
 
-        if (user_rpm>100) {                                                 //Защита от выхода за пределы регулировки оборотов
+  user_rpm_k1 = rpm_1_cold_dac + ((user_rpm-50)*(user_reg/50)); //Изменение оборотов пользователем на 1м холод вентиляторе
+  user_rpm_k2 = rpm_2_cold_dac + ((user_rpm-50)*(user_reg/50)); //Изменение оборотов пользователем на 2м холод вентиляторе
+
+  switch (indicator) {                                          //Выбор режима: температура или обороты
+      case 1: {
+        user_rpm = encoder_read(user_rpm, 1);                   //Изменение значения оборотов
+        change_val(user_rpm,user_rpm, 0);                       //Индикация оборотов на дисплее
+
+        if (user_rpm>100) {                                     //Защита от выхода за пределы регулировки оборотов
           user_rpm=100;
         } else if (user_rpm<1) {
           user_rpm=1;
         }
 
-        user_rpm_k1 = rpm_1_cold_dac + ((user_rpm-50)*(user_reg/50)); //Изменение оборотов пользователем на 1м холод вентиляторе
-        user_rpm_k2 = rpm_1_cold_dac + ((user_rpm-50)*(user_reg/50)); //Изменение оборотов пользователем на 2м холод вентиляторе
-
-        if (user_rpm_k1<user_reg_min) {                               //Защита от выхода за перделы значений вентилятора 1 холодного
+        if (user_rpm_k1<user_reg_min) {                         //Защита от выхода за перделы значений вентилятора 1 холодного
           user_rpm_k1=user_reg_min;
         } else if (user_rpm_k1>255) {
           user_rpm_k1=255;
         }
 
-         if (user_rpm_k2<user_reg_min) {                              //Защита от выхода за перделы значений вентилятора 2 холодного
+         if (user_rpm_k2<user_reg_min) {                        //Защита от выхода за перделы значений вентилятора 2 холодного
           user_rpm_k2=user_reg_min;
         } else if (user_rpm_k2>255) {
           user_rpm_k2=255;
-        }                                                   //Режим оборотов
+        }      
+        } break;  
 
-      case false:                                                     //Режим вентилятора
-
-        break;
+      case 2: {                                                       //Режим температуры
+       t_wish=encoder_read(t_wish,0.5);                               //изменение темепературы крутилкой
+       change_val(t_real,t_wish,1);                                   //индикация температуры на дисплее
+       if (t_wish>35) {                                               //Защита от выхода за пределы
+         t_wish=35;
+       } else if (t_wish<18.5) {
+         t_wish=18;
+       }
+       break;
+      }
   }
+
+  if ((t_real-t_wish)>0) {                                 //Если температура выше желаемой, пишем регистр термостата
+    temp_init = true;
+  } else {
+    temp_init = false;
+  }
+  thermostat_port |=(temp_init<<thermostat_pin);          //Выдача значения на ногу термостата
+
+  
+  /*if (!fan1 & k1_action) {                                //Если не сработало реле вентилятора и компрессор работает
+    k1_init=true;                                         //Разрешаем включение 
+  } else if(fan1) {                                       //Если не сработало реле вентилятора разрешаем включение
+    k1_init=true; 
+  } else {                                                //Если реле сработало запрещаем включение
+    k1_init=false;
+  }
+
+  
+  if (!k1_button & !fan1) {                               //Если нажата кнопка и не вкл реле вентилятора
+    if (millis()-fan1_last_time>time_fan) {               //Если прошло время Разрешаем работу
+      fan1_time=true;                                     
+    }
+  } else if (!k1_button & fan1) {                         //Если кнопка нажата а вентилятор выключен разрешаем работу
+    fan1_time=true;
+  } else {                                                //Иначе запрещаем работу
+    fan1_last_time = millis();
+    fan1_time=false;
+  }
+
+
+  if (!k1_button & fan1_time & k1_init & temp_init) {
+    k1_action = true;
+  } else {k1_action = false;}*/
+
+  if (!k1_button) {                                     //Если нажата кнопка
+    k1_action=true;                                     //Включаем компрессор
+  }
+
+  if (!fan1){                                                                      //Если включён вентилятор 
+    //Serial.print(fan1_last_time); Serial.print(" "); Serial.println(millis());                                 
+    if (millis()-fan1_last_time>time_fan) {                                        //Если прошло время 
+      k1_action=true;                                                              //Включаем компрессор
+    } else {
+      k1_action=false;
+    }
+  } else {
+    fan1_last_time=millis(); 
+  }
+
+  if (!fan1 & fan1_time) {
+    k1_action=true;} 
+
+  if (!temp_init) {                                       //Если не сработал термостат
+    k1_action = false;                                    //выключаем компрессор
+  }
+
+  if (k1_button) {                                        //Если кнопка не нажата 
+    k1_action=false;                                      //выключаем компрессор
+  }
+
+  /*if (!k1_action) {
+    fan1_last_time=millis();
+  } */
+
+  k1_action ? fan1_time=true:fan1_time=false;
+
+  Serial.println(k1_action);
 }
 
 /*Функция настройки вентилятора первого холодного*/
@@ -266,12 +375,14 @@ byte read_dip () {
 
 /*Функция считывания значений реле и кнопок компрессора*/
 void read_relay() {
-  fan1 = ( 0b01 & read_pcf(pcf6) );                   //считывание реле первого вентилятора 
-  fan2 = ( 0b10 & read_pcf(pcf6) );                  //считывание реле второго вентилятора
-  low_press_1 =  ( 0b10000 & read_pcf(pcf5)    );    //считывание реле низкого давления 1
-  high_press_1 = ( 0b100000 & read_pcf(pcf5)   );    //считывание реле высокого давления 1
-  low_press_2 =  ( 0b1000000 & read_pcf(pcf5)  );    //считывание реле низкого давления 2
-  high_press_2 = ( 0b10000000 & read_pcf(pcf5) );    //считывание реле высокого давления 2
+  fan1 = ( 0b01 & read_pcf(pcf6) );                               //считывание реле первого вентилятора 
+  fan2 = ( 0b10 & read_pcf(pcf6) );                               //считывание реле второго вентилятора
+  low_press_1 =  ( 0b10000 & read_pcf(pcf5)    );                 //считывание реле низкого давления 1
+  high_press_1 = ( 0b100000 & read_pcf(pcf5)   );                 //считывание реле высокого давления 1
+  low_press_2 =  ( 0b1000000 & read_pcf(pcf5)  );                 //считывание реле низкого давления 2
+  high_press_2 = ( 0b10000000 & read_pcf(pcf5) );                 //считывание реле высокого давления 2
+  k1_button=      bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 1
+  k2_button=      bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 2
 }
 
 /*Функция вывода на 7seg дисплей */
@@ -556,6 +667,5 @@ bool change_val(float cur_val, float dis_val, bool init) {
 } 
 
 /*
-
 
 */
