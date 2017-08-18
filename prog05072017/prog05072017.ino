@@ -26,7 +26,7 @@
 
 #define compressor1_port PORTD//Определение порта компрессора
 #define compressor1_pin 3
-#define compressor2_port PIND
+#define compressor2_port PORTD
 #define compressor2_pin 5
 
 #define button1_port PINB  //Определение кнопки компрессора
@@ -37,7 +37,7 @@
 #define thermostat_port PORTC//Определение порта термостата
 #define thermostat_pin 6
 
-#define time_fan 1500
+#define time_fan 1300
 
 /*Датчик температуры*/
 DHT dht(A1, DHT22); //ДТ1
@@ -97,13 +97,14 @@ float t_real;                  //температура реальная с да
 float t_wish=25;               //требуемая температура
 bool k1_button;                //кнопка первого компрессора 
 bool k2_button;                //кнопка второго компрессора
-bool k1_init;                  //разрешение на включение первого крмпрессора
-bool k2_init;                  //разрешение на включение первого крмпрессора
+bool k1_init;                  //регистр включённого первого крмпрессора
+bool k2_init;                  //регистр включённого второго крмпрессора
 bool k1_action;                //переменная работы первого компрессора
 bool k2_action;                //переменная работы второго компрессора
 bool temp_init;                //Хранит состояние термостата (нужно ли включить или нет)
 unsigned long fan1_last_time;  //Переменная хранения времени после работы вентилятора перед запуском компрессора
-bool fan1_time;                //Регистр прошедшего времени после работы первого вентилятора
+unsigned long fan2_last_time;  //Переменная хранения времени после работы вентилятора перед запуском компрессора
+
 
 
 /* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////  
@@ -116,8 +117,9 @@ void setup(){
   /*Установка пинов энкодера*/
   pinMode(6, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
   pinMode(7, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
-  /*Установка пинов датчика температуры*/
+  /*Установка пинов кнопок компрессора*/
   pinMode(8, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
+  pinMode(9, INPUT_PULLUP);
   /*Установка пина кнопки энкодера*/
   pinMode(A3, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
   /*Установка портов компрессора как выходы*/
@@ -185,9 +187,6 @@ void loop(){
   /*Замер скорости работы программы*/
   //cur_millis_speed = millis(); // время на конец программы
   //Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы
-
-  
-/*  compressor1_port |=(k1_action<<compressor1_pin);*/
   
   /************************************/
 }
@@ -250,65 +249,49 @@ void work() {
   }
   thermostat_port |=(temp_init<<thermostat_pin);          //Выдача значения на ногу термостата
 
-  
-  /*if (!fan1 & k1_action) {                                //Если не сработало реле вентилятора и компрессор работает
-    k1_init=true;                                         //Разрешаем включение 
-  } else if(fan1) {                                       //Если не сработало реле вентилятора разрешаем включение
-    k1_init=true; 
-  } else {                                                //Если реле сработало запрещаем включение
-    k1_init=false;
+  compressors_action();
+}
+
+/*Логика работы компрессоров*/
+void compressors_action () {
+
+  !k1_button ? k1_action=true : 0;                               //Если нажата кнопка включаем компрессор
+  !k2_button ? k2_action=true : 0;
+
+  if (k1_action) {                                               //Если работает компрессор
+    if (!fan1) {                                                 //Если включён вентилятор
+      if (millis()-fan1_last_time>time_fan) {                    //Если прошло время 
+        k1_action=true;                                          //включаем компрессор
+      } else {                                                   //иначе
+        k1_init ? 0:k1_action=false;                             //выключаем компрессор, если он не работал
+      }
+    } 
   }
 
-  
-  if (!k1_button & !fan1) {                               //Если нажата кнопка и не вкл реле вентилятора
-    if (millis()-fan1_last_time>time_fan) {               //Если прошло время Разрешаем работу
-      fan1_time=true;                                     
-    }
-  } else if (!k1_button & fan1) {                         //Если кнопка нажата а вентилятор выключен разрешаем работу
-    fan1_time=true;
-  } else {                                                //Иначе запрещаем работу
-    fan1_last_time = millis();
-    fan1_time=false;
+  if (k2_action) {                                               
+    if (!fan2) {                                                 
+      if (millis()-fan2_last_time>time_fan) {                     
+        k2_action=true;                                          
+      } else {                                                  
+        k2_init ? 0:k2_action=false;                             
+      }
+    } 
   }
 
+  !temp_init ? k1_action = false:0;                              //Если не сработал термостат выключаем компрессор
+  !temp_init ? k2_action = false:0;
 
-  if (!k1_button & fan1_time & k1_init & temp_init) {
-    k1_action = true;
-  } else {k1_action = false;}*/
+  k1_button ? k1_action=false:0;                                 //Если кнопка не нажата выключаем компрессор
+  k2_button ? k2_action=false:0;
 
-  if (!k1_button) {                                     //Если нажата кнопка
-    k1_action=true;                                     //Включаем компрессор
-  }
+  (fan1 || k1_button || !temp_init) ? fan1_last_time=millis():0; //Если не включён вентилятор или кнопка не нажата или не сработал термостат запоминаем секунды
+  (fan2 || k2_button || !temp_init) ? fan2_last_time=millis():0;
 
-  if (!fan1){                                                                      //Если включён вентилятор 
-    //Serial.print(fan1_last_time); Serial.print(" "); Serial.println(millis());                                 
-    if (millis()-fan1_last_time>time_fan) {                                        //Если прошло время 
-      k1_action=true;                                                              //Включаем компрессор
-    } else {
-      k1_action=false;
-    }
-  } else {
-    fan1_last_time=millis(); 
-  }
+  k1_action ? k1_init=true: k1_init=false;                       //Если компрессор работает, запоминаем переменную
+  k2_action ? k2_init=true: k2_init=false;
 
-  if (!fan1 & fan1_time) {
-    k1_action=true;} 
-
-  if (!temp_init) {                                       //Если не сработал термостат
-    k1_action = false;                                    //выключаем компрессор
-  }
-
-  if (k1_button) {                                        //Если кнопка не нажата 
-    k1_action=false;                                      //выключаем компрессор
-  }
-
-  /*if (!k1_action) {
-    fan1_last_time=millis();
-  } */
-
-  k1_action ? fan1_time=true:fan1_time=false;
-
-  Serial.println(k1_action);
+  k1_action ? compressor1_port |=(1<<compressor1_pin) : compressor1_port &= ~(1 << compressor1_pin); //Включение компрессоров в зависимости от переменной
+  k2_action ? compressor2_port |=(1<<compressor2_pin) : compressor2_port &= ~(1 << compressor2_pin); 
 }
 
 /*Функция настройки вентилятора первого холодного*/
@@ -382,7 +365,7 @@ void read_relay() {
   low_press_2 =  ( 0b1000000 & read_pcf(pcf5)  );                 //считывание реле низкого давления 2
   high_press_2 = ( 0b10000000 & read_pcf(pcf5) );                 //считывание реле высокого давления 2
   k1_button=      bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 1
-  k2_button=      bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 2
+  k2_button=      bitRead(button2_port, button2_pin);             //считывание кнопки компрессора 2
 }
 
 /*Функция вывода на 7seg дисплей */
