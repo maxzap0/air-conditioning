@@ -11,27 +11,27 @@
 #include <EEPROM.h>
 #include <timer_radar.h>
 #include <DHT.h>
-#include <Wire.h> //библиотека I2C
+#include <Wire.h>      //библиотека I2C
 #include "frequency.h"
 
-#define pcf1 0x38 // первый сегиент индикатора
-#define pcf2 0x39 //
-#define pcf3 0x3A //
-#define pcf4 0x3B // последний сегмент индикатора
-#define pcf5 0x3C // ДИПы
-#define pcf6 0x3D // 
+#define pcf1 0x38      // первый сегиент индикатора
+#define pcf2 0x39      //
+#define pcf3 0x3A      //
+#define pcf4 0x3B      // последний сегмент индикатора
+#define pcf5 0x3C      // ДИПы
+#define pcf6 0x3D      // 
 
-#define dac1 0x2C // первый DAC
-#define dac2 0x2D //
-#define dac3 0x2E //
-#define dac4 0x2F // последний DAC
+#define dac1 0x2C      // первый DAC
+#define dac2 0x2D      //
+#define dac3 0x2E      //
+#define dac4 0x2F      // последний DAC
 
-#define A_PORT PIND //Порт ножки A энкодера
-#define A_pin 6     //Пин ножки А энкодера
-#define B_PORT PIND //Порт ножки B энкодера
-#define B_pin 7     //Пин ножки B энкодера
+#define A_PORT PIND    //Порт ножки A энкодера
+#define A_pin 6        //Пин ножки А энкодера
+#define B_PORT PIND    //Порт ножки B энкодера
+#define B_pin 7        //Пин ножки B энкодера
 
-#define user_reg 60 //диапазон регулировки вентилятора пользователем
+#define user_reg 60     //диапазон регулировки вентилятора пользователем
 #define user_reg_min 70 //Минимальный уровень скорости вентилятора для пользователя
 
 #define compressor1_port PORTD//Определение порта компрессора
@@ -120,8 +120,6 @@ bool temp_init;                //Хранит состояние термост�
 unsigned long fan1_last_time;  //Переменная хранения времени после работы вентилятора перед запуском компрессора
 unsigned long fan2_last_time;  //Переменная хранения времени после работы вентилятора перед запуском компрессора
 
-
-
 /* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////  
 
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
@@ -204,6 +202,10 @@ void loop(){
         seg7_write(pcf1, ' ', 0);
   } 
 
+ /* Wire.beginTransmission(pcf1); // начало передачи по адресу
+  Wire.write(0b11111110); // вывод значения
+  Wire.endTransmission(); // конец передачи
+*/
   /*Замер скорости работы программы*/
   /* cur_millis_speed = millis(); // время на конец программы
    Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы*/
@@ -257,7 +259,7 @@ void err() {
 /*Рабочий режим работы программы*/
 void work() {
 
-  bitRead(PINC, 3) ? indicator=1 : indicator = 2;   //Считывание значения переключателя 
+  bitRead(PINC, 3) ? indicator = 1 : indicator = 2;        //Считывание значения переключателя 
 
   dac_write(dac1, user_rpm_k1);                            //Включение вентиляторов
   dac_write(dac2, user_rpm_k2);
@@ -432,8 +434,6 @@ void read_relay() {
   low_press_2 =  ( 0b1000000 & read_pcf(pcf5)  );                 //считывание реле низкого давления 2
   high_press_2 = ( 0b10000000 & read_pcf(pcf5) );                 //считывание реле высокого давления 2
 
-
-
   k1_button=      bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 1
   k2_button=      bitRead(button2_port, button2_pin);             //считывание кнопки компрессора 2
 }
@@ -446,105 +446,105 @@ void seg7_write(byte addr, unsigned char val, byte dot){
   {
     // перевод символа в двоичный
     case 0:
-      _val_bit = B00111111;
+      _val_bit = B11000000;
       break;
     case 1:
-      _val_bit = B00000110;
+      _val_bit = B11111001;
       break;
     case 2:
-      _val_bit = B01011011;
+      _val_bit = B10100100;
       break;
     case 3:
-      _val_bit = B01001111;
+      _val_bit = B10110000;
       break;
     case 4:
-      _val_bit = B01100110;
+      _val_bit = B10011001;
       break;
     case 5:
-      _val_bit = B01101101;
+      _val_bit = B10010010;
       break;
     case 6:
-      _val_bit = B01111101;
+      _val_bit = B10000010;
       break;
     case 7:
-      _val_bit = B00000111;
+      _val_bit = B11111000;
       break;
     case 8:
-      _val_bit = B01111111;
+      _val_bit = B10000000;
       break;
     case 9:
-      _val_bit = B01101111;
+      _val_bit = B10010000;
       break;
     case 'a':
-      _val_bit = B01110111;
+      _val_bit = B10001000;
       break;
     case 'b':
-      _val_bit = B01111100;
+      _val_bit = B10000011;
       break;
     case 'c':
-      _val_bit = B00111001;
+      _val_bit = B11000110;
       break;
     case 'd':
-      _val_bit = B01011110;
+      _val_bit = B10100001;
       break;
     case 'e':
-      _val_bit = B01111001;
+      _val_bit = B10000110;
       break;
     case 'f':
-      _val_bit = B01110001;
+      _val_bit = B10001110;
       break;
     case 'g':
-      _val_bit = B00111101;
+      _val_bit = B11000010;
       break;
     case 'h':
       _val_bit = B01110110;
       break;
     case 'i':
-      _val_bit = B00000110;
+      _val_bit = B11111001;
       break;
     case 'j':
-      _val_bit = B00001110;
+      _val_bit = B11110001;
       break;
     case 'l':
-      _val_bit = B00111000;
+      _val_bit = B11000111;
       break;
     case 'n':
-      _val_bit = B01010100;
+      _val_bit = B10101011;
       break;
     case 'p':
-      _val_bit = B01110011;
+      _val_bit = B10001100;
       break;
     case 'q':
-      _val_bit = B01100111;
+      _val_bit = B10011000;
       break;
     case 'r':
-      _val_bit = B01010000;
+      _val_bit = B10101111;
       break;
     case 's':
-      _val_bit = B01101101;
+      _val_bit = B10010010;
       break;
     case 't':
-      _val_bit = B01111000;
+      _val_bit = B10000111;
       break;
     case 'u':
-      _val_bit = B00111110;
+      _val_bit = B11000001;
       break;
     case 'y':
-      _val_bit = B01101110;
+      _val_bit = B10010001;
       break;
     case ' ':
-      _val_bit = B00000000;
+      _val_bit = B11111111;
       break;
     case '-':
-      _val_bit = B01000000;
+      _val_bit = B10111111;
       break;
     case '*':
-      _val_bit = B01100011;
+      _val_bit = B10011100;
       break;
   }
   Wire.beginTransmission(addr); // начало передачи по адресу
   Wire.write(_val_bit); // вывод значения
-  dot? Wire.write(_val_bit |= 1 << 7):Wire.write(_val_bit |= 0 << 7); // вывод точки
+  dot? Wire.write(_val_bit &=~(1<<7)):Wire.write(_val_bit |=(1<<7)); // вывод точки
   Wire.endTransmission(); // конец передачи
 }
 
