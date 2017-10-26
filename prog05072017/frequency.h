@@ -57,8 +57,8 @@ ISR(TIMER1_COMPA_vect)
 //Выводит импульсы в массив по указателю *frequency соответственно ножкам порта (*frequency[0]=PINx0, *frequency[0]=PINx1,...)
 void freq(int* frequency[], unsigned int time_start, unsigned int time_metering)
 {
-	int prev[4]={0,};
-	int real[4]={0,};
+	int prev[4]={1,};
+	int real[4]={1,};
 	int i=0;
 	char reg_while=0;
 	while ((g_seconds >= time_start ) &(g_seconds < time_start + time_metering))
