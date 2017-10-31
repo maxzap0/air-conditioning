@@ -2,7 +2,7 @@
 000 - рабочий режим
 100 - настройка первого холодного вентилятора
 010 - настройка второго холодного вентилятора
-001 - наатройка первого горячего вентилятора
+001 - наcтройка первого горячего вентилятора
 110 - настройка втрого горячего вентилятора
 111 - температура со второго датчика температуры
 101 - индикация ошибок
@@ -39,7 +39,7 @@
 #define B_PORT PIND     //Порт ножки B энкодера
 #define B_pin 7         //Пин ножки B энкодера
 
-#define user_reg 100     //диапазон регулировки вентилятора пользователем
+#define user_reg 100    //диапазон регулировки вентилятора пользователем
 #define user_reg_min 60 //Минимальный уровень скорости вентилятора для пользователя
 
 #define compressor1_port PORTD  //Определение порта компрессора
@@ -47,22 +47,22 @@
 #define compressor2_port PORTD
 #define compressor2_pin 5
 
-#define button1_port PINB       //Определение кнопки компрессора
+#define button1_port PINB         //Определение кнопки компрессора
 #define button1_pin 0
-#define button2_port PINB       //Определение кнопки компрессора
+#define button2_port PINB         //Определение кнопки компрессора
 #define button2_pin 1
 
-#define thermostat_port PORTC   //Определение порта термостата
+#define thermostat_port PORTC     //Определение порта термостата
 #define thermostat_pin 6
 
-#define clockPort PORTB         //Порт clock для SPI
+#define clockPort PORTB           //Порт clock для SPI
 #define clockPin 5
 
-#define time_fan 1500           //Время после которого при работе вентилятора включится компрессор (ms)
+#define time_fan 1500             //Время после которого при работе вентилятора включится компрессор (ms)
 
 /*Датчик температуры*/
-DHT dht(A1, DHT22);  //ДТ1
-DHT dht2(A2, DHT22); //ДТ2
+DHT dht(A1, DHT22);               //ДТ1
+DHT dht2(A2, DHT22);              //ДТ2
 
 /*Замер скорости работы программы*/
 uint16_t prev_millis_speed = 0;   // предыдущее время
@@ -70,10 +70,10 @@ uint16_t cur_millis_speed = 0;    // текущее время
 uint16_t time_millis = 0;         // время прошедшее после включения
 
 /*Работа энкодера*/
-byte A = 1;          // Первоначальное сосояние A
-byte B = 1;          // Первоначальное состояние B
-byte pinLast = 1;    // Служебная переменная
-bool enc_init=false; //Регистр вращения энкодера
+byte A = 1;                       // Первоначальное сосояние A
+byte B = 1;                       // Первоначальное состояние B
+byte pinLast = 1;                 // Служебная переменная
+bool enc_init=false;              //Регистр вращения энкодера
 
 /*Считывание датчик температуры */
 byte count_cycle_temp = 0;
@@ -82,19 +82,19 @@ byte count_cycle_temp = 0;
 timer_radar blink_disp(2);
 
 /*Функция change_val*/
-bool change_enc_init;                   // регистр функции change_val
-unsigned long int change_time_prev;     // для запоминания времени
-bool change_val_int;                    // регистр функции change_val
+bool change_enc_init;                  // регистр функции change_val
+unsigned long int change_time_prev;    // для запоминания времени
+bool change_val_int;                   // регистр функции change_val
 
 /*Переменные оборотов вентилятора*/
-uint16_t rpm_1_cold;      //первый холодный вентилятор, текущее значение оборотов
-uint16_t rpm_1_cold_dac;  //Значение выдаваемое на dac первого холодного венттидятора
-uint16_t rpm_2_cold;      //второй холодный вентилятор, текущее значение оборотов
-uint16_t rpm_2_cold_dac;  //Значение выдаваемое на dac второго холодного венттидятора
-uint16_t rpm_1_hot;       //Первый горячий вентилятор
-uint16_t rpm_1_hot_dac;   //Значение выдаваемое на dac первого горячего венттидятора
-uint16_t rpm_2_hot;       //Второй горячий вентилятор
-uint16_t rpm_2_hot_dac;   //Значение выдаваемое на dac второго горячего венттидятора
+uint16_t rpm_1_cold;                   //первый холодный вентилятор, текущее значение оборотов
+uint16_t rpm_1_cold_dac;               //Значение выдаваемое на dac первого холодного венттидятора
+uint16_t rpm_2_cold;                   //второй холодный вентилятор, текущее значение оборотов
+uint16_t rpm_2_cold_dac;               //Значение выдаваемое на dac второго холодного венттидятора
+uint16_t rpm_1_hot;                    //Первый горячий вентилятор
+uint16_t rpm_1_hot_dac;                //Значение выдаваемое на dac первого горячего венттидятора
+uint16_t rpm_2_hot;                    //Второй горячий вентилятор
+uint16_t rpm_2_hot_dac;                //Значение выдаваемое на dac второго горячего венттидятора
 
 /*Замер скорости работы вентиляторов*/
 int *rpm_fan[4];      
@@ -102,17 +102,17 @@ int mass[4] = {0,};
 int i;
 
 /*Переменные считаные с реле*/
-bool fan1;          //состояние 1 горячего вентилятора
-bool fan2;          //состояние 2 горячего вентилятора
-bool low_press_1;   //реле низкого давоения 1
-bool high_press_1;  //реле высокого давления 1
-bool low_press_2;   //реле низкого давления 2
-bool high_press_2;  //реле высокого давления 2
-bool contr_f;       //реле контроля фаз
-bool k1_off;        //неисправность 1го компрессора
-bool k2_off;        //неисправность 2го компрессора
-bool k1_overload;   //перегрузка 1го компрессора
-bool k2_overload;   //перегрузка 2го компрессора  
+bool fan1;                     //состояние 1 горячего вентилятора
+bool fan2;                     //состояние 2 горячего вентилятора
+bool low_press_1;              //реле низкого давоения 1
+bool high_press_1;             //реле высокого давления 1
+bool low_press_2;              //реле низкого давления 2
+bool high_press_2;             //реле высокого давления 2
+bool contr_f;                  //реле контроля фаз
+bool k1_off;                   //неисправность 1го компрессора
+bool k2_off;                   //неисправность 2го компрессора
+bool k1_overload;              //перегрузка 1го компрессора
+bool k2_overload;              //перегрузка 2го компрессора  
 
 /*Переменные рабочего режима*/
 byte indicator = true;         //выбор режима отображения. 1-температура 2-обороты
@@ -141,27 +141,27 @@ float temp=50;
 /**///////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup(){
-  Serial.begin(115200);      // скорость com-порта
-  Wire.begin();              // подключение к шине wire
+  Serial.begin(115200);              // скорость com-порта
+  Wire.begin();                      // подключение к шине wire
 
   /*Установка пинов энкодера*/
-  pinMode(6, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
-  pinMode(7, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
+  pinMode(6, INPUT_PULLUP);          // установка пина на вход, подтяжка к +5В
+  pinMode(7, INPUT_PULLUP);          // установка пина на вход, подтяжка к +5В
   /*Установка пинов кнопок компрессора*/
-  pinMode(8, INPUT_PULLUP);  // установка пина на вход, подтяжка к +5В
+  pinMode(8, INPUT_PULLUP);          // установка пина на вход, подтяжка к +5В
   pinMode(9, INPUT_PULLUP);
   /*Установка пина кнопки энкодера*/
-  pinMode(A3, INPUT_PULLUP); // установка пина на вход, подтяжка к +5В
+  pinMode(A3, INPUT_PULLUP);         // установка пина на вход, подтяжка к +5В
   /*Установка портов компрессора как выходы*/
-  pinMode(3, OUTPUT);        //компрессор 1
-  pinMode(5, OUTPUT);        //компрессор 2
+  pinMode(3, OUTPUT);                //компрессор 1
+  pinMode(5, OUTPUT);                //компрессор 2
   
-  //SPI РЕЖИМ
-  pinMode(10, OUTPUT);       //latch
-  pinMode(11, OUTPUT);       //data
-  pinMode(13, OUTPUT);       //clock
+  //SPI РЕЖИМ, раскомментировать
+  pinMode(10, OUTPUT);               //latch
+  pinMode(11, OUTPUT);               //data
+  pinMode(13, OUTPUT);               //clock
 
-  pinMode(A2, OUTPUT);     //раскоментировать, если вместо ДТ2 нужен выход термостата.
+  pinMode(A2, OUTPUT);               //раскоментировать, если вместо ДТ2 нужен выход термостата.
 
   /*Считывание первоначальных значение EEPROM*/
   rpm_1_cold_dac = EEPROM.read(1);   //значение rpm первого холодного вентилятора
@@ -191,10 +191,10 @@ void loop(){
 
   /*Считывание оборотов вентиляторов*/
   freq(rpm_fan, 3, 1);
-  rpm_1_cold=*rpm_fan[1]; //первый холодный
-  rpm_2_cold=*rpm_fan[3]; //второй холодный
-  rpm_1_hot=*rpm_fan[0];  //первый горячий 
-  rpm_2_hot=*rpm_fan[2];  //второй горячий
+  rpm_1_cold=*rpm_fan[0]; //первый холодный
+  rpm_2_cold=*rpm_fan[2]; //второй холодный
+  rpm_1_hot=*rpm_fan[1];  //первый горячий 
+  rpm_2_hot=*rpm_fan[3];  //второй горячий
 
   //Считывание режима dip переключаталей и переход в нужный режим
   switch (read_dip()) {
@@ -270,10 +270,10 @@ void work() {
 
   bitRead(PINC, 3) ? indicator = 1 : indicator = 2;             //Считывание значения переключателя 
 
-  dac_write(dac1, user_rpm_k1);                                 //Включение вентиляторов
-  dac_write(dac2, user_rpm_k2);
-  dac_write(dac3, rpm_1_hot_dac);
-  dac_write(dac4, rpm_2_hot_dac);  
+  dac_write(dac3, user_rpm_k1);                                 //Включение вентиляторов
+  dac_write(dac4, user_rpm_k2);
+  dac_write(dac1, rpm_1_hot_dac);
+  dac_write(dac2, rpm_2_hot_dac);  
 
   user_rpm_k1 = rpm_1_cold_dac + ((user_rpm-50)*(user_reg/50)); //Изменение оборотов пользователем на 1м холод вентиляторе
   user_rpm_k2 = rpm_2_cold_dac + ((user_rpm-50)*(user_reg/50)); //Изменение оборотов пользователем на 2м холод вентиляторе
@@ -380,7 +380,7 @@ void fan_setting1 () {
   if (change_val(rpm_1_cold, rpm_1_cold_dac, 0)) {      //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
     EEPROM.write(1, rpm_1_cold_dac);                    //Пишем значение в EEPROM                
   }
-  dac_write(dac1, rpm_1_cold_dac);                      //Вывод текущего значения на dac
+  dac_write(dac3, rpm_1_cold_dac);                      //Вывод текущего значения на dac
 }
 
 /*Функция настройки вентилятора второго холодного*/
@@ -394,7 +394,7 @@ void fan_setting2 () {
   if (change_val(rpm_2_cold, rpm_2_cold_dac, 0)) {      //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
     EEPROM.write(2, rpm_2_cold_dac);                    //Пишем значение в EEPROM
   }
-  dac_write(dac2, rpm_2_cold_dac);                      //Вывод текущего значения на dac
+  dac_write(dac4, rpm_2_cold_dac);                      //Вывод текущего значения на dac
 }
 
 /*Функция настройки вентилятора первого горячего*/
@@ -409,7 +409,7 @@ void fan_setting3 () {
   if (change_val(rpm_1_hot, rpm_1_hot_dac, 0)) {       //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
     EEPROM.write(3, rpm_1_hot_dac);                    //Пишем значение в EEPROM
   }
-  dac_write(dac3, rpm_1_hot_dac);                      //Вывод текущего значения на dac
+  dac_write(dac1, rpm_1_hot_dac);                      //Вывод текущего значения на dac
 }
 
 /*Функция настройки вентилятора первого горячего*/
@@ -424,7 +424,7 @@ void fan_setting4 () {
   if (change_val(rpm_2_hot, rpm_2_hot_dac, 0)) {       //Если функция изменения (мигание дисплеем) значения закончила работу (отдала true) 
     EEPROM.write(4, rpm_2_hot_dac);                    //Пишем значение в EEPROM
   }
-  dac_write(dac4, rpm_2_hot_dac);                      //Вывод текущего значения на dac
+  dac_write(dac2, rpm_2_hot_dac);                      //Вывод текущего значения на dac
 }
 
 /*Функция считывания значений dip-переключателей, возвращает значение dip-переключателей*/
@@ -724,9 +724,13 @@ void dac_write(uint8_t addr, uint16_t val) { //Принимает адрес и 
 
   } else if (dac_mode=='SPI') {   //Если SPI режим
 
-    addr==0x2C ? b1=val*2:0;      //Если dac1, пишем в b1 значение, выдаваемое на dac1 
-    addr==0x2E ? b2=val*2:0;      //
-    addr==0x2F ? b3=val*2:0;      //
+   /* addr==0x2C ? b1=val*2:0;      //Если dac, пишем в b1 значение, выдаваемое на dac
+    addr==0x2D ? b2=val*2:0;      //
+    addr==0x2E ? b3=val*2:0;      //Если dac, пишем в b2 значение, выдаваемое на dac*/
+
+    addr=='dac1' ? b1=val*2:0;      //Если dac, пишем в b1 значение, выдаваемое на dac
+    addr=='dac2' ? b2=val*2:0;      //
+    addr=='dac3' ? b3=val*2:0;      //Если dac, пишем в b2 значение, выдаваемое на dac
 
     b1 |= (1<<9);                 //Устанавливаем 9й бит (бит включения dac)
     b2 |= (1<<9);
@@ -738,8 +742,6 @@ void dac_write(uint8_t addr, uint16_t val) { //Принимает адрес и 
     shiftOutmy(b1>>8 | b2<<2);
     shiftOutmy(b1);
     latchPort |= (1<<latchPin);   //Защёлка высокий уровень, выдаём значение
-
-    Serial.print(" b1: "); Serial.print(b1/2); Serial.print(" b2: "); Serial.print(b2/2); Serial.print(" b3: "); Serial.println(b3/2);
 
   }
 }
