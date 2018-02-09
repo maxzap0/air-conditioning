@@ -63,22 +63,29 @@
 #define time_fan 3000             //Время после которого при работе вентилятора включится компрессор (ms)
 
 /*Датчик температуры*/
-DHT dht(A1, DHT22);               //ДТ1
-DHT dht2(A2, DHT22);              //ДТ2
+DHT dht(A1, DHT22);               //ДТ1  //основной
+DHT dht2(A2, DHT22);              //ДТ2  //дополнительный
 
 /*Замер скорости работы программы*/
 uint16_t prev_millis_speed = 0;   // предыдущее время
 uint16_t cur_millis_speed = 0;    // текущее время
 uint16_t time_millis = 0;         // время прошедшее после включения
 
+uint16_t cur_time;
+uint16_t last_time;
+
 /*Работа энкодера*/
-byte A = 1;                       // Первоначальное сосояние A
-byte B = 1;                       // Первоначальное состояние B
+unsigned char A;                       // Первоначальное сосояние A
+unsigned char B;                       // Первоначальное состояние B
 byte pinLast = 1;                 // Служебная переменная
+byte pinLastB =1;
 bool enc_init=false;              // Регистр вращения энкодера
 
 /*Считывание датчик температуры */
 byte count_cycle_temp = 0;
+
+/*Считывание ДИПов*/
+byte count_cycle_read_relay = 0;
 
 /*Таймер мигания дисплея*/
 timer_radar blink_disp(2);
@@ -87,6 +94,12 @@ timer_radar blink_disp(2);
 bool change_enc_init;                  // регистр функции change_val
 unsigned long int change_time_prev;    // для запоминания времени
 bool change_val_int;                   // регистр функции change_val
+
+int blink_on_count=0; //счётчик мигания дисплея
+
+/*Переменные прерывания с pcf*/
+bool reg_pcf=true;     //регистр прерывания от pcf
+uint16_t read_dip_int; //значение переключателей dip
 
 /*Переменные оборотов вентилятора*/
 uint16_t rpm_1_cold;                   //первый холодный вентилятор, текущее значение оборотов
@@ -148,15 +161,18 @@ int t_max=55;                  //температура выше которой 
 int temp_array[ ] = {35, 40, 45, 50, 55, 60}; //Массив со "ступенями" температур, на которых будут изменяться обороты
 int rpm_array[ ] = { };                       //Массив со "ступенями" оборотов, соответствующий массиву температур
 int temp_num=0;                               //Текущий индекс массива temp_array и rpm_array
+
 /* Временные переменные *//////////////////////////////////////////////////////////////////////////////////////////
+
+int val_dac=255;
 
 /**////////////////////////////////////////////////////////////////////////////////////////////////////////////////
 
 void setup(){
 
-  /*//Для первоначального установления оборотов вентилятора, раскоментировать при первой прошивке
+  //Для первоначального установления оборотов вентилятора, раскоментировать при первой прошивке
   //                 35   40   45   50   55   60        //температура
-  int _k_rpm[  ] = {275, 190, 205, 225, 240, 255};      //первоначальная таблица поправочных коэфициэнтов увелиения работы вентилятора
+  /*int _k_rpm[  ] = {275, 190, 205, 225, 240, 255};      //первоначальная таблица поправочных коэфициэнтов увелиения работы вентилятора
   for (int _i=(sizeof(temp_array)/2)-1; _i>=0; _i--) {  //передираем коэфициенты                                                           
     EEPROM.write(_i+4, _k_rpm[_i]);                     //записываем в память
   }
@@ -170,16 +186,18 @@ void setup(){
   pinMode(6, INPUT_PULLUP);          // установка пина на вход, подтяжка к +5В
   pinMode(7, INPUT_PULLUP);          // установка пина на вход, подтяжка к +5В
   /*Установка пинов кнопок компрессора*/
-  pinMode(8, INPUT_PULLUP);          // установка пина на вход, подтяжка к +5В
-  pinMode(9, INPUT_PULLUP);
+  //pinMode(8, INPUT_PULLUP);        // установка пина на вход, подтяжка к +5В
+  //pinMode(9, INPUT_PULLUP);
   /*Установка пина кнопки энкодера*/
   pinMode(A3, INPUT_PULLUP);         // установка пина на вход, подтяжка к +5В
   /*Установка портов компрессора как выходы*/
   pinMode(3, OUTPUT);                //компрессор 1
-  pinMode(5, OUTPUT);                //компрессор 2
+  pinMode(5, OUTPUT);                //компрессор 2 
+
+  attachInterrupt(0, pcf_int, CHANGE); // привязываем 0-е прерывание к функции
   
   //SPI РЕЖИМ, раскомментировать. I2C закоментировать
-  /*pinMode(10, OUTPUT);               //latch
+ /* pinMode(10, OUTPUT);               //latch
   pinMode(11, OUTPUT);               //data
   pinMode(13, OUTPUT);               //clock*/
 
@@ -197,7 +215,7 @@ void setup(){
   }
 
   /*Настройка измерителя частоты*/
-  setup_TC1(5);                                  //Период замера в секундах
+  setup_TC1(6);                                  //Период замера в секундах
   for (int i=0; i<4; i++) {rpm_fan[i]=&mass[i];}
 
  /*Временные установки*//////////////////////////////////////////////////////////////////////////////////////////
@@ -211,51 +229,74 @@ void loop(){
   /************************************/
 
   /*Считывание состояния реле и кнопок*/
-  read_relay();
+ /* if (reg_pcf==true) {              //если сработал регистр прерывания
+     read_relay();                  //считываем состояние реле
+     read_dip_int = read_dip();     //считываем дип переключатели
+     reg_pcf=0;                     //обнуляем регистр
+
+     read_pcf(pcf5);                //считывание с PCF для обнуления прерывания
+     read_pcf(pcf6);
+  }*/
+ 
 
   /*считывание значение температуры*/
-  t_real=temp_metr(100, 1); 
-  t_out=temp_metr(150, 0);                                         
+/*  t_real=temp_metr(200, 1); 
+  t_out=temp_metr(250, 0);  */
 
-  //Считывание режима dip переключаталей и переход в нужный режим
-  switch (read_dip()) {
-      case 15 :                                  //Рабочий режим
-          work();
-        break;
-      case 14 :                                  //настройка 1го холодного вентилятора
-        fan_setting1();
-        break;
-      case 13:                                   //настройка 2го холодного вентилятора
-        fan_setting2();
-        break;
-      case 10:                                   //Режим индикации ошибок
-        err();
-        break;
-      case 11:                                   //настройка 1го горячего вентилятора
-        fan_setting3();
-        break;
-      case 12:                                   //настройка 2го горячего вентилятора
-        fan_setting4();
-        break;
-      case 8:                                    //вывод температуры со второго датчика темепературы
-        write_display_temp(temp_metr(50,0));
-        break;
-      case 7:                                    //настройка таблицы оборотов вентилятора
-        rpm_hot_adjustment_manual();
-        break;
-      default :                                  //если комбинация дипов не встретилось выводим 'no'
-        seg7_write(pcf4, 0, 0);
-        seg7_write(pcf3, 'n', 0);
-        seg7_write(pcf2, ' ', 0);
-        seg7_write(pcf1, ' ', 0);
-  } 
+  /*Выбор режима работы*/
+ /* switch (read_dip_int) {
+  //switch (14) {
+         case 15 :                                  //Рабочий режим
+             work();
+           break;
+         case 14 :                                  //настройка 1го холодного вентилятора
+            fan_setting1();
+           break;
+         case 13:                                   //настройка 2го холодного вентилятора
+             fan_setting2();
+           break;
+         case 10:                                   //Режим индикации ошибок
+             err();
+           break;
+         case 11:                                   //настройка 1го горячего вентилятора
+             fan_setting3();
+           break;
+         case 12:                                   //настройка 2го горячего вентилятора
+             fan_setting4();
+           break;
+         case 8:                                    //вывод температуры со второго датчика темепературы
+             write_display_temp(temp_metr(50,0));
+           break;
+         case 7:                                    //настройка таблицы оборотов вентилятора
+             rpm_hot_adjustment_manual();
+           break;
+         default :                                  //если комбинация дипов не встретилось выводим 'no'
+             seg7_write(pcf4, 0, 0);
+             seg7_write(pcf3, 'n', 0);
+             seg7_write(pcf2, ' ', 0);
+             seg7_write(pcf1, ' ', 0);     
+     }*/
+
 
   /*Замер скорости работы программы*/
- /* cur_millis_speed = millis(); // время на конец программы
-   Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы*/
-  /************************************/
+  /* cur_millis_speed = millis(); // время на конец программы
+  //Serial.println(cur_millis_speed - prev_millis_speed); // вывод времени исполнения программы*/
 
-  Serial.println(t_real);
+
+  /************************************/
+  //val_dac=255;
+  val_dac=encoder_read(val_dac,1);
+  dac_write(dac1, val_dac);
+  dac_write(dac2, val_dac);
+  dac_write(dac3, val_dac);
+  dac_write(dac4, val_dac);
+  write_display_rpm(val_dac);
+  //Serial.println(val_dac);
+  //write_display_rpm(50);
+  //t_wish=encoder_read(t_wish, 0.5);
+  //Serial.println(t_wish); Serial.print(" ");
+  // Serial.print(t_real); Serial.print(" "); //Serial.println(read_dip_int);
+    
 }
 
 /*Индикация ошибок*/
@@ -277,19 +318,19 @@ void err() {
   !k1_overload  ? err_byte|=(1<<7):0;       //код 8: перегрузка 1 компрессора
   !k2_overload  ? err_byte|=(1<<8):0;       //код 9: перегрузка 2 компрессора
 
-  write_display_err(0);                     //изначально код ошибки 0
+  if (err_byte==0) {write_display_err(0);}                  //изначально код ошибки 0
 
   for ( int _err_count=0; _err_count<=8; _err_count++) {  //Перебироаем ошибки
     if (((err_byte >> _err_count) & 1)==1) {              //Если бит=1, значит ошибка  
       err_array[_err_count] = true;                       //Записываем бит ошибки
-      while (err_time<500) {                              //Пока не прошло время
-        write_display_err(_err_count);                    //Выводим код ошибки
+      while (err_time<10) {                              //Пока не прошло время
+        write_display_err(_err_count+1);                  //Выводим код ошибки
         err_time++;                                       //прибавляем время
       }
       err_time=0;                                         //обнуляем время
-    } else {err_array[_err_count]=false;}                 //Есди не ошибка пишем 0
+    } else {err_array[_err_count]=false;}                 //Если не ошибка пишем 0
   }
-} 
+}
 
 /*Настройка таблицы оборотов с панели управления*/
 void rpm_hot_adjustment_manual() {
@@ -345,7 +386,7 @@ void rpm_hot_adjustment() {
 /*Рабочий режим работы программы*/
 void work() {
 
-  bitRead(PINC, 3) ? indicator = 1 : indicator = 2;             //Считывание значения переключателя
+  bitRead(PINC, 3) ? indicator = 2 : indicator = 1;             //Считывание значения переключателя
 
   dac_write(dac3, user_rpm_k1);                                 //Включение холодных вентиляторов
   dac_write(dac4, user_rpm_k2);
@@ -385,7 +426,7 @@ void work() {
        change_val(t_real,t_wish,1);                              //индикация температуры на дисплее
        if (t_wish>35) {                                          //Защита от выхода за пределы
          t_wish=35;
-       } else if (t_wish<18.5) {
+       } else if (t_wish<18) {
          t_wish=18;
        }
        break;
@@ -519,21 +560,22 @@ byte read_dip () {
 
 /*Функция считывания значений реле и кнопок компрессора*/
 void read_relay() {
-  fan1         = ( 0b1 & read_pcf(pcf6)        );                //считывание реле первого вентилятора 
-  fan2         = ( 0b10 & read_pcf(pcf6)       );                //считывание реле второго вентилятора
-  contr_f      = ( 0b100 & read_pcf(pcf6)      );                //считывание реле конроля фаз
-  k1_off       = ( 0b1000 & read_pcf(pcf6)     );                //неисправность компрессора 1
-  k2_off       = ( 0b10000 & read_pcf(pcf6)    );                //неисправность компрессора 2
-  k1_overload  = ( 0b100000 & read_pcf(pcf6)   );                //перегрузка 1го компрессора
-  k2_overload  = ( 0b1000000 & read_pcf(pcf6)  );                //перегрузка 2го компрессора
 
-  low_press_1  = ( 0b10000 & read_pcf(pcf5)    );                 //считывание реле низкого давления 1
-  high_press_1 = ( 0b100000 & read_pcf(pcf5)   );                 //считывание реле высокого давления 1
-  low_press_2  = ( 0b1000000 & read_pcf(pcf5)  );                 //считывание реле низкого давления 2
-  high_press_2 = ( 0b10000000 & read_pcf(pcf5) );                 //считывание реле высокого давления 2
+    fan1         = ( 0b1 & read_pcf(pcf6)        );                //считывание реле первого вентилятора 
+    fan2         = ( 0b10 & read_pcf(pcf6)       );                //считывание реле второго вентилятора
+    contr_f      = ( 0b100 & read_pcf(pcf6)      );                //считывание реле конроля фаз
+    k1_off       = ( 0b1000 & read_pcf(pcf6)     );                //неисправность компрессора 1
+    k2_off       = ( 0b10000 & read_pcf(pcf6)    );                //неисправность компрессора 2
+    k1_overload  = ( 0b100000 & read_pcf(pcf6)   );                //перегрузка 1го компрессора
+    k2_overload  = ( 0b1000000 & read_pcf(pcf6)  );                //перегрузка 2го компрессора
 
-  k1_button    = bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 1
-  k2_button    = bitRead(button2_port, button2_pin);             //считывание кнопки компрессора 2
+    low_press_1  = ( 0b10000 & read_pcf(pcf5)    );                //считывание реле низкого давления 1
+    high_press_1 = ( 0b100000 & read_pcf(pcf5)   );                //считывание реле высокого давления 1
+    low_press_2  = ( 0b1000000 & read_pcf(pcf5)  );                //считывание реле низкого давления 2
+    high_press_2 = ( 0b10000000 & read_pcf(pcf5) );                //считывание реле высокого давления 2
+
+    k1_button    = bitRead(button1_port, button1_pin);             //считывание кнопки компрессора 1
+    k2_button    = bitRead(button2_port, button2_pin);             //считывание кнопки компрессора 2
 }
 
 //Функция вывода на 7seg дисплей Формат seg7_write(адрес, значение, точка)
@@ -658,8 +700,8 @@ void display_hide(byte init){
  }
 
 //Мигание дисплея. Принимает значение выводимое на дисплей и вид измерения (false - температура, true - обороты)
-void display_blink(float val, bool init) {
-  if (blink_disp.blink(50)) {       //Частота мерцания
+/*void display_blink(float val, bool init) {
+  if (blink_disp.blink(200)) {       //Частота мерцания
     if (init==0) {
       write_display_rpm ((int)val);
     } else if (init==1) {
@@ -667,9 +709,31 @@ void display_blink(float val, bool init) {
     } else if (init==2) {
       write_display_rpm ((int)val);
     }
-     // init ? write_display_temp(val) : write_display_rpm ((int)val);
   } else {
       display_hide(1);
+  }
+}*/
+
+void display_blink(float val, bool init) {
+  
+  uint8_t _value_on=180;                 //период включения дисплея
+  uint8_t _value_off=220;                //период выклюяения дисплея
+
+  if (blink_on_count <= _value_on) {     //если счётчик меньше значения включения
+    if (init==0) {                       //в соответсвии с типом отображения
+      write_display_rpm ((int)val);      //выводим значение
+    } else if (init==1) {
+      write_display_temp(val);
+    } else if (init==2) {
+      write_display_rpm ((int)val);
+    }
+  } 
+  else {                                 //если счётчик значения больше
+      display_hide(1);                   //скрываем дисплей
+  }
+  blink_on_count++;                      //инкримент счётчика
+  if (blink_on_count>_value_off) {       //обнуление счётчика
+    blink_on_count=0;
   }
 }
 
@@ -763,7 +827,8 @@ void write_display_err(uint16_t val) {
 
 /*Функция инкримента(декремента) энкодера*/
 // Принимает значение и возвращает ++ или -- этого значения, k - значение прибавляемое/убавляемое
-float encoder_read(float init_value, float k){
+
+/*float encoder_read(float init_value, float k){
   float _count = 0;
   //Считываем состояние ножек энкодера
   A = bitRead (A_PORT, A_pin);
@@ -771,20 +836,112 @@ float encoder_read(float init_value, float k){
 
   // Если А изменил состояние первым то прибавляем, в противном случает убавляем
   if (A != pinLast)
+   {
+      if (B != A)
+     {
+       _count = _count + k; 
+       enc_init=true;      //регистр врщения энкодера
+     }
+     else
+     {
+       _count = _count - k; 
+       enc_init=true;      //регистр вращения энкодера
+     }
+   } else {enc_init=false;}
+
+  pinLast = A; // Присваеваем последнее значение A
+  return init_value + _count; // Возвращаем изменённое значение
+}*/
+
+/*float encoder_read(float init_value, float k){
+  float _count = 0;
+  //Считываем состояние ножек энкодера
+  A = bitRead (A_PORT, A_pin);
+  B = bitRead (B_PORT, B_pin);
+
+  // Если А изменил состояние первым то прибавляем, в противном случает убавляем
+  if (A != pinLast)
+   {
+      if (B == A)
+     {
+       _count = _count - k; 
+       enc_init=true;      //регистр вращения энкодера
+     }
+   } else {enc_init=false;}
+  pinLast = A; // Присваеваем последнее значение A
+
+  if (B != pinLastB)
+   {
+      if (A == B)
+     {
+       _count = _count + k; 
+       enc_init=true;      //регистр вращения энкодера
+     }
+   } else {enc_init=false;}
+  pinLastB = B; // Присваеваем последнее значение A
+
+  return init_value + _count; // Возвращаем изменённое значение
+}*/
+
+/*float encoder_read(float init_value, float k){
+  float _count = 0;
+
+  cur_time = millis();
+  //Считываем состояние ножек энкодера
+  A = bitRead (A_PORT, A_pin);
+  B = bitRead (B_PORT, B_pin);
+
+  // Если А изменил состояние первым то прибавляем, в противном случает убавляем
+
+  if (cur_time - last_time > 5){
+    last_time = cur_time;
+
+    if ((!A) && (pinLast))
+     {
+        if (B)
+         {
+           _count = _count + k; 
+           enc_init=true;      //регистр вращения энкодера
+         } else {
+          _count = _count - k; 
+           enc_init=true;      //регистр вращения энкодера
+         }
+
+     } else {enc_init=false;}
+
+  }
+
+  pinLast = A; // Присваеваем последнее значение A
+
+  return init_value + _count; // Возвращаем изменённое значение
+}*/
+
+/*Функция инкримента(декремента) энкодера*/
+// Принимает значение и возвращает ++ или -- этого значения, k - значение прибавляемое/убавляемое
+float encoder_read(float init_value, float k){
+ float _count = 0;
+
+ //Считываем состояние ножек энкодера
+  A = bitRead (A_PORT, A_pin);
+  B = bitRead (B_PORT, B_pin);
+  
+  // Если А изменил состояние первым то прибавляем, в противном случает убавляем
+  if (!A && pinLast)
   {
-    if (B != A)
+    if (B)
     {
       _count = _count + k; 
-      enc_init=true;      //регистр врщения энкодера
+      enc_init=true;      //регистр вращения энкодера
     }
-    else
+    else 
     {
       _count = _count - k; 
       enc_init=true;      //регистр вращения энкодера
-    }
+    }    
   } else {enc_init=false;}
 
   pinLast = A; // Присваеваем последнее значение A
+
   return init_value + _count; // Возвращаем изменённое значение
 }
 
@@ -814,19 +971,32 @@ void dac_write(uint8_t addr, uint16_t val) { //Принимает адрес и 
 
   } else if (dac_mode=='SPI') {     //Если SPI режим
 
-    addr=='dac1' ? b1=val*2:0;      //Если dac, пишем в b1 значение, выдаваемое на dac
-    addr=='dac2' ? b2=val*2:0;      //
-    addr=='dac3' ? b3=val*2:0;      //Если dac, пишем в b2 значение, выдаваемое на dac
+    
+    //val=0;
 
-    b1 |= (1<<9);                   //Устанавливаем 9й бит (бит включения dac)
-    b2 |= (1<<9);
-    b3 |= (1<<9);
+    addr==dac1 ? b1=(val*2)+512:0;      //Если dac, пишем в b1 значение, выдаваемое на dac
+    addr==dac2 ? b2=(val*2)+512:0;      //
+    addr==dac3 ? b3=(val*2)+512:0;      //Если dac, пишем в b2 значение, выдаваемое на dac*/
+
+    /*b1=0b0000000000;
+    b2=0b0000000001;
+    b3=0b1001100001;*/
+
+   /* b1 |= (1<<0);                   //Устанавливаем 9й бит (бит включения dac)
+    b2 |= (1<<0);
+    b3 |= (1<<0);*/
 
     latchPort &= ~ (1<<latchPin);   //Защёлка низкий уровень
-    shiftOutmy(b3>>4);              //пишем в порт значение
-    shiftOutmy(b2>>6 | b3<<4);
-    shiftOutmy(b1>>8 | b2<<2);
-    shiftOutmy(b1);
+      /*shiftOutmy(b3>>4);              //пишем в порт значение
+      shiftOutmy(b2>>6 | b3<<4);
+      shiftOutmy(b1>>8 | b2<<2);
+      shiftOutmy(b1);*/
+
+      //пишем в порт значение
+      shiftOutmy(b3<<2);
+      shiftOutmy(b2<<4 | b3>>6);
+      shiftOutmy(b1<<6 | b2>>4);
+      shiftOutmy(b1>>2);
     latchPort |= (1<<latchPin);     //Защёлка высокий уровень, выдаём значение
 
   }
@@ -851,25 +1021,25 @@ bool change_val(float cur_val, float dis_val, int init) {
     change_time_prev=millis();    //запоминаем время
   }
 
-  if (change_enc_init==true) {                                                      //если сработал регистр
-    if (millis()-change_time_prev>700) {                                            //если прошло время                                        
-      if (init==0) {                                                                //В зависимости от init выбираем формат вывода
+  if (change_enc_init==true) {                                     //если сработал регистр
+    if (millis()-change_time_prev>2000) {                           //если прошло время                                        
+      if (init==0) {                                               //В зависимости от init выбираем формат вывода
         write_display_rpm((int)cur_val);
       } else if (init==1) {
         write_display_temp(cur_val);
       } else if (init==2) {
         write_display_rpm(cur_val);
       }
-      if (change_val_int==true) {                                                   //регистр, для вывода значения функции один раз
-        change_val_int=false;                                                       //меняем регистр                                                   
-        return true;                                                                //функция отдаёт true один раз
+      if (change_val_int==true) {                                   //регистр, для вывода значения функции один раз
+        change_val_int=false;                                       //меняем регистр                                                   
+        return true;                                                //функция отдаёт true один раз
       }
-    } else {                                                                        //если не прошло время
-      display_blink(dis_val, init);                                                 //мигаем дисплеем
+    } else {                                                        //если не прошло время
+      display_blink(dis_val, init);                                 //мигаем дисплеем
       change_val_int=true;                                                      
     }
-  } else {                                                                          //если регистр не сработал выводим текущие показания
-    if (init==0) {                                                                  //В зависимости от init выбираем формат вывода
+  } else {                                                          //если регистр не сработал выводим текущие показания
+    if (init==0) {                                                  //В зависимости от init выбираем формат вывода
       write_display_rpm((int)cur_val);
     } else if (init==1) {
       write_display_temp(cur_val);
@@ -878,14 +1048,16 @@ bool change_val(float cur_val, float dis_val, int init) {
     }
 
   }
-  return false;                                                                     //всё время отдаём false
+  return false;                                                     //всё время отдаём false
 } 
 
 /*Ускорение работы функции ShiftOut - выводит бит информации в порт последовательно. val - бит информации*/
 void shiftOutmy(uint8_t val) {
   uint8_t i;
   for (i = 0; i < 8; i++)  {
-    val & (1 << (7 - i)) ? dataPort |= (1<<dataPin) : dataPort &= ~(1<<dataPin);
+   /* val & (1 << (7 - i)) ? dataPort |= (1<<dataPin) : dataPort &= ~(1<<dataPin);*/
+    val & (1 << i) ? dataPort |= (1<<dataPin) : dataPort &= ~(1<<dataPin);
+    
     clockPort |= (1<<clockPin);
     clockPort &= ~ (1 << clockPin);   
   }
@@ -899,6 +1071,13 @@ void rpm_read () {
   rpm_1_hot=*rpm_fan[1];  //первый горячий 
   rpm_2_hot=*rpm_fan[3];  //второй горячий
 }
+
+/*Функция обработки прерывания от INT pcf8573*/
+void pcf_int(){
+  reg_pcf=true;          //регистр срабатывания прерывания
+  //Serial.println("INT_pcf8574a_enable");
+}
+
 
 /*
 
