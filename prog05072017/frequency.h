@@ -29,7 +29,7 @@ volatile unsigned int g_period = 0;
 void setup_TC1(unsigned int period) {
 	TCCR1A = 0;			//Настройка таймера 1, канала А
 	TCCR1B = 0x5;			//Предделитель CLK/1024;
-	OCR1A = 0x3D09;			//Прерывание раз в секунду на частоте 16MГц
+	OCR1A = 0x2DC6;			//Прерывание раз в секунду на частоте 16MГц
 	TIMSK1 = 0x2;			//Запуск таймера по совпадению 1А
 	sei();				//Разрешаем прерывания (запрещаем: cli(); )
 	g_period = period;
@@ -109,7 +109,7 @@ void freq(int* frequency[], unsigned int time_start, unsigned int time_metering)
 	{
 		for (i=0;i<=3;i++)
 		{
-			*frequency[i]=(int)((*frequency[i])/2/time_metering);
+			*frequency[i]=(int)((*frequency[i])/2);
 		}
 	}
 	
